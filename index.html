@@ -3,24 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Acompanhamento Semanal (Local)</title>
+    <title>Dashboard de Acompanhamento Semanal (Colorido)</title>
     
     <!-- Carregamento do Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Configuração do Tailwind -->
+    <!-- Configuração do Tailwind com a nova paleta de cores -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        'primary-dark': '#1e293b',
-                        'primary-accent': '#5b21b6',
+                        // Novo esquema de cores
+                        'primary-dark': '#1f2937', // Cinza escuro para texto/fundo
+                        'primary': '#4f46e5', // Indigo 600 - Novo Acabamento Principal
+                        
+                        // Cores de status e meta (mantidas ou ajustadas)
                         'danger-light': '#fef2f2',
                         'danger-border': '#f87171',
                         'green-meta': '#dcfce7',
                         'orange-meta': '#fff7ed',
                         'blue-meta': '#e0f2fe',
+
+                        // Cores de Fundo para o Kanban (muito leves)
+                        'column-tratamento': '#fffbeb', // Light Yellow/Orange (Amber-50)
+                        'column-tratados': '#ecfdf5', // Light Green (Emerald-50)
+                        'column-proximos': '#eef2ff', // Light Blue/Violet (Indigo-50)
+                        'column-historico': '#f3f4f6', // Light gray (Padrão)
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -31,13 +40,15 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Fundo do corpo ligeiramente diferente */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f7f8f9; 
         }
 
+        /* Gradiente do Header com o novo Primary-Color */
         .header-bg {
-            background-image: linear-gradient(to right, #1f2937, #4c1d95);
+            background-image: linear-gradient(to right, #1f2937, #4f46e5); /* Dark Gray to Indigo */
             border-radius: 1.5rem;
         }
 
@@ -72,7 +83,7 @@
         /* Estilo para loading/status */
         .loading-spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #5b21b6;
+            border-top: 4px solid #4f46e5; /* Cor do spinner ajustada para o novo Primary */
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -103,19 +114,21 @@
     <!-- 1. HEADER -->
     <header class="header-bg p-8 text-white rounded-xl shadow-lg mb-8">
         <h1 class="text-3xl md:text-4xl font-extrabold text-center">Dashboard de Acompanhamento Semanal</h1>
-        <p class="text-center text-gray-300 mt-2">Dados armazenados localmente no seu navegador (localStorage).</p>
+        <!-- REMOVIDA A LINHA ABAIXO:
+        <p class="text-center text-gray-300 mt-2">Dados armazenados localmente no seu navegador (localStorage).</p> 
+        -->
     </header>
 
     <main class="space-y-10">
 
         <!-- 2. FERRAMENTAS E FILTROS -->
         <section id="filters-section" class="bg-white p-6 md:p-8 rounded-xl shadow-md">
-            <h2 class="text-xl font-bold mb-4 flex items-center">Ferramentas e Filtros:</h2>
+            <h2 class="text-xl font-bold mb-4 flex items-center text-primary-dark">Ferramentas e Filtros:</h2>
             <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                 <!-- Filtro Colaborador -->
                 <div class="col-span-full md:col-span-2">
                     <label for="filterColaborador" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Colaborador</label>
-                    <select id="filterColaborador" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                    <select id="filterColaborador" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                         <option value="todos">Todos os Colaboradores</option>
                         <!-- Options serão preenchidas via JS -->
                     </select>
@@ -124,13 +137,13 @@
                 <!-- Filtro Data Início -->
                 <div>
                     <label for="filterDataRegistroInicio" class="block text-sm font-medium text-gray-700 mb-1">Data de Registro (Início)</label>
-                    <input type="date" id="filterDataRegistroInicio" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                    <input type="date" id="filterDataRegistroInicio" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                 </div>
 
                 <!-- Filtro Data Fim -->
                 <div>
                     <label for="filterDataConclusaoFim" class="block text-sm font-medium text-gray-700 mb-1">Previsão/Conclusão (Fim)</label>
-                    <input type="date" id="filterDataConclusaoFim" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                    <input type="date" id="filterDataConclusaoFim" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                 </div>
 
                 <!-- Botão Limpar Filtros -->
@@ -147,7 +160,7 @@
 
         <!-- 3. KANBAN DE PROCESSOS -->
         <section id="kanban-section" class="bg-white p-6 md:p-8 rounded-xl shadow-md">
-            <h2 class="text-2xl font-extrabold mb-6">Kanban de Processos</h2>
+            <h2 class="text-2xl font-extrabold mb-6 text-primary-dark">Kanban de Processos</h2>
 
             <div id="kanban-board" class="flex overflow-x-auto space-x-6 pb-4">
                 <!-- As colunas serão renderizadas aqui pelo JS -->
@@ -156,7 +169,7 @@
 
         <!-- 4. REGISTRAR NOVO PROCESSO (Formulário) -->
         <section id="register-section" class="bg-white p-6 md:p-8 rounded-xl shadow-md">
-            <h2 class="text-2xl font-extrabold mb-6 flex items-center">
+            <h2 class="text-2xl font-extrabold mb-6 flex items-center text-primary-dark">
                 <span class="mr-2">🔥</span> Registrar Novo Processo
             </h2>
 
@@ -165,16 +178,16 @@
                     <!-- Colaborador (Select) -->
                     <div>
                         <label for="inputColaborador" class="block text-sm font-medium text-gray-700 mb-1">Colaborador</label>
-                        <select id="inputColaborador" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                        <select id="inputColaborador" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                             <!-- Options serão preenchidas via JS -->
                         </select>
-                        <button type="button" id="manageColaboradoresBtn" class="text-xs text-primary-accent hover:text-indigo-700 mt-1">Gerenciar Colaboradores</button>
+                        <button type="button" id="manageColaboradoresBtn" class="text-xs text-primary hover:text-indigo-700 mt-1">Gerenciar Colaboradores</button>
                     </div>
 
                     <!-- Status do Processo (Select) -->
                     <div>
                         <label for="inputStatus" class="block text-sm font-medium text-gray-700 mb-1">Status do Processo</label>
-                        <select id="inputStatus" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                        <select id="inputStatus" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                             <option value="Em Tratamento">Em Tratamento</option>
                             <option value="Tratados na semana">Tratados na semana</option>
                             <option value="Próximos Processos">Próximos Processos</option>
@@ -185,13 +198,13 @@
                     <!-- Data de Registro (Cadastro) -->
                     <div>
                         <label for="inputDataRegistro" class="block text-sm font-medium text-gray-700 mb-1">Data de Registro (Inclusão)</label>
-                        <input type="date" id="inputDataRegistro" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                        <input type="date" id="inputDataRegistro" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                     </div>
 
                     <!-- Data de Previsão (Opcional) -->
                     <div>
                         <label for="inputDataPrevisao" class="block text-sm font-medium text-gray-700 mb-1">Data de Previsão (Opcional)</label>
-                        <input type="date" id="inputDataPrevisao" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                        <input type="date" id="inputDataPrevisao" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                     </div>
 
                     <!-- Data de Conclusão (Opcional, se JÁ feito) -->
@@ -206,19 +219,19 @@
                 <!-- Título do Processo/Tarefa -->
                 <div>
                     <label for="inputTitulo" class="block text-sm font-medium text-gray-700 mb-1">Nome do Processo/Tarefa</label>
-                    <input type="text" id="inputTitulo" placeholder="Ex: Fechamento mensal Cliente Alpha" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2">
+                    <input type="text" id="inputTitulo" placeholder="Ex: Fechamento mensal Cliente Alpha" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
                 </div>
 
                 <!-- Observações/Detalhes -->
                 <div>
                     <label for="inputObservacoes" class="block text-sm font-medium text-gray-700 mb-1">Detalhes/Descrição</label>
-                    <textarea id="inputObservacoes" rows="4" placeholder="O que está sendo feito ou o que foi/será feito..." class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-accent focus:border-primary-accent p-2"></textarea>
+                    <textarea id="inputObservacoes" rows="4" placeholder="O que está sendo feito ou o que foi/será feito..." class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2"></textarea>
                     <p class="text-xs text-gray-500 mt-1">Dica: Use hífens (-) ou asteriscos (*) para simular tópicos (bullets).</p>
                 </div>
 
                 <!-- Botão Incluir Processo -->
                 <div class="text-right">
-                    <button type="submit" id="adicionarProcessoBtn" class="px-8 py-3 bg-primary-accent text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-150">
+                    <button type="submit" id="adicionarProcessoBtn" class="px-8 py-3 bg-primary text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-150">
                         Adicionar Processo
                     </button>
                 </div>
@@ -430,6 +443,17 @@
                 default: return 'border-gray-300';
             }
         };
+        
+        // Novo: Função para obter a cor de fundo customizada para a coluna
+        window.getColumnBgClass = function(status) {
+            switch (status) {
+                case 'Em Tratamento': return 'bg-column-tratamento';
+                case 'Tratados na semana': return 'bg-column-tratados';
+                case 'Próximos Processos': return 'bg-column-proximos';
+                case 'Histórico de Concluídos': return 'bg-column-historico';
+                default: return 'bg-gray-100';
+            }
+        };
 
         window.setupFlashEffect = function() {
             if (window.flashInterval) {
@@ -521,15 +545,18 @@
             window.STATUS_COLUMNS.forEach(status => {
                 const columnTitle = status;
                 const cardList = kanbanMap[status];
+                const columnBgClass = window.getColumnBgClass(status); // Novo: Cor de fundo da coluna
 
                 const columnDiv = document.createElement('div');
                 columnDiv.className = 'kanban-column flex-shrink-0';
                 columnDiv.innerHTML = `
-                    <div class="sticky top-0 z-10 bg-gray-50 rounded-t-lg p-3 shadow-md border-b-2 ${window.getStatusBorderColor(status)}">
-                        <h3 class="font-bold text-lg">${columnTitle}</h3>
-                        <span class="text-xs text-gray-500">${cardList.length} processos</span>
+                    <!-- Header da Coluna -->
+                    <div class="sticky top-0 z-10 p-3 shadow-md border-b-2 ${window.getStatusBorderColor(status)} ${columnBgClass} rounded-t-lg">
+                        <h3 class="font-bold text-lg text-primary-dark">${columnTitle}</h3>
+                        <span class="text-xs text-gray-600">${cardList.length} processos</span>
                     </div>
-                    <div class="kanban-cards p-2 pt-4 bg-gray-50 rounded-b-lg">
+                    <!-- Cards da Coluna -->
+                    <div class="kanban-cards p-2 pt-4 ${columnBgClass} rounded-b-lg flex-grow">
                         ${cardList.map(window.createProcessCard).join('')}
                     </div>
                 `;
@@ -847,7 +874,7 @@
 
                         <div class="flex justify-end space-x-3 pt-4">
                             <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
-                            <button type="submit" class="px-4 py-2 bg-primary-accent text-white font-semibold rounded-lg hover:bg-indigo-700 transition">Acessar Relatório</button>
+                            <button type="submit" class="px-4 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-indigo-700 transition">Acessar Relatório</button>
                         </div>
                     </form>
                 </div>
@@ -1054,6 +1081,7 @@
         function setupEventListeners() {
             const mainForm = document.getElementById('newProcessForm');
             if (mainForm) {
+                // Atualiza o listener para usar a nova cor principal
                 mainForm.addEventListener('submit', (e) => window.handleProcessSubmit(e, null));
             }
 
