@@ -3,1123 +3,893 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Acompanhamento Semanal (Colorido)</title>
-    
-    <!-- Carregamento do Tailwind CSS CDN -->
+    <title>Dashboard de Acompanhamento Semanal | Processos Jurídicos</title>
+    <!-- Tailwind CSS CDN para estilização moderna e responsiva -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome CDN para ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- SweetAlert2 CDN para modais amigáveis (Login, Edição, Exclusão) -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- SheetJS CDN para Exportação XLSX/Excel -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     
-    <!-- Configuração do Tailwind com a nova paleta de cores -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        // Novo esquema de cores
-                        'primary-dark': '#1f2937', // Cinza escuro para texto/fundo
-                        'primary': '#4f46e5', // Indigo 600 - Novo Acabamento Principal
-                        
-                        // Cores de status e meta (mantidas ou ajustadas)
-                        'danger-light': '#fef2f2',
-                        'danger-border': '#f87171',
-                        'green-meta': '#dcfce7',
-                        'orange-meta': '#fff7ed',
-                        'blue-meta': '#e0f2fe',
-
-                        // Cores de Fundo para o Kanban (muito leves)
-                        'column-tratamento': '#fffbeb', // Light Yellow/Orange (Amber-50)
-                        'column-tratados': '#ecfdf5', // Light Green (Emerald-50)
-                        'column-proximos': '#eef2ff', // Light Blue/Violet (Indigo-50)
-                        'column-historico': '#f3f4f6', // Light gray (Padrão)
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Configuração do Tailwind e Fonts -->
     <style>
-        /* Fundo do corpo ligeiramente diferente */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        
+        :root {
+            --cor-principal: #3b82f6; /* Blue 500 */
+            --cor-alerta: #ef4444; /* Red 500 */
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f8f9; 
+            background-color: #f3f4f6;
         }
 
-        /* Gradiente do Header com o novo Primary-Color */
-        .header-bg {
-            background-image: linear-gradient(to right, #1f2937, #4f46e5); /* Dark Gray to Indigo */
-            border-radius: 1.5rem;
-        }
-
-        /* Estilização para o efeito de "piscar" em vermelho */
+        /* Efeito de piscar em vermelho para processos urgentes (Prazo <= 2 dias) */
         @keyframes blink-red {
-            0% { background-color: #fef2f2; border-color: #f87171; box-shadow: 0 0 5px rgba(248, 113, 113, 0.7); }
-            50% { background-color: #fca5a5; border-color: #dc2626; box-shadow: 0 0 10px rgba(220, 38, 38, 1); }
-            100% { background-color: #fef2f2; border-color: #f87171; box-shadow: 0 0 5px rgba(248, 113, 113, 0.7); }
+            0%, 100% { 
+                border-color: var(--cor-alerta);
+                box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+            }
+            50% { 
+                border-color: transparent;
+                box-shadow: none;
+            }
         }
 
-        .blink-alert {
-            animation: blink-red 1s infinite;
+        .alert-blink {
+            animation: blink-red 1.5s infinite;
+            background-color: #fecaca; /* Red 200 de fundo suave */
         }
 
-        .kanban-column {
-            min-width: 300px;
-            max-width: 300px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .kanban-cards {
+        /* Rolagem da Coluna Kanban */
+        .kanban-cards-container {
+            max-height: 60vh; /* Altura máxima para a rolagem */
             overflow-y: auto;
-            max-height: 70vh;
-            padding-right: 0.5rem;
-            flex-grow: 1;
+            padding-right: 8px; /* Espaço para a barra de rolagem */
         }
-
-        .icon-edit::after { content: '✏️'; font-size: 1rem; opacity: 0.6; cursor: pointer; }
-        .icon-delete::after { content: '🗑️'; font-size: 1rem; opacity: 0.6; cursor: pointer; margin-left: 0.5rem; }
         
-        /* Estilo para loading/status */
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4f46e5; /* Cor do spinner ajustada para o novo Primary */
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform(360deg); }
+        /* Cabeçalho Fixo do Kanban */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 1rem 0;
+            margin-bottom: 0.5rem;
         }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="min-h-screen">
 
-    <!-- Modal para Mensagens -->
-    <div id="modal-container" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden justify-center items-center">
-        <div id="modal-content" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-            <!-- Conteúdo do modal será injetado pelo JavaScript -->
+    <!-- HEADER -->
+    <header class="bg-gray-800 text-white p-6 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-bold tracking-tight">⚖️ Dashboard de Acompanhamento Semanal</h1>
+             <div id="auth-status" class="text-sm font-light">
+                <!-- Status de Autenticação/ID do Usuário será injetado aqui -->
+            </div>
         </div>
-    </div>
-    
-    <!-- Indicador de Status/Loading -->
-    <div id="status-indicator" class="fixed top-4 right-4 z-40 p-3 bg-indigo-100 text-indigo-800 rounded-lg shadow-md flex items-center hidden">
-        <div class="loading-spinner mr-3"></div>
-        <span id="status-message">Carregando dados locais...</span>
-    </div>
-
-    <!-- 1. HEADER -->
-    <header class="header-bg p-8 text-white rounded-xl shadow-lg mb-8">
-        <h1 class="text-3xl md:text-4xl font-extrabold text-center">Dashboard de Acompanhamento Semanal</h1>
-        <!-- REMOVIDA A LINHA ABAIXO:
-        <p class="text-center text-gray-300 mt-2">Dados armazenados localmente no seu navegador (localStorage).</p> 
-        -->
     </header>
 
-    <main class="space-y-10">
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
 
-        <!-- 2. FERRAMENTAS E FILTROS -->
-        <section id="filters-section" class="bg-white p-6 md:p-8 rounded-xl shadow-md">
-            <h2 class="text-xl font-bold mb-4 flex items-center text-primary-dark">Ferramentas e Filtros:</h2>
+        <!-- SEÇÃO 1: FILTROS E EXPORTAÇÃO -->
+        <section class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">🔎 Ferramenta de Filtros e Relatório</h2>
             <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-                <!-- Filtro Colaborador -->
-                <div class="col-span-full md:col-span-2">
-                    <label for="filterColaborador" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Colaborador</label>
-                    <select id="filterColaborador" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
-                        <option value="todos">Todos os Colaboradores</option>
-                        <!-- Options serão preenchidas via JS -->
+                
+                <div class="col-span-1 md:col-span-1">
+                    <label for="filtro-colaborador" class="block text-sm font-medium text-gray-700">Colaborador</label>
+                    <select id="filtro-colaborador" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-white">
+                        <option value="">Todos</option>
                     </select>
                 </div>
 
-                <!-- Filtro Data Início -->
-                <div>
-                    <label for="filterDataRegistroInicio" class="block text-sm font-medium text-gray-700 mb-1">Data de Registro (Início)</label>
-                    <input type="date" id="filterDataRegistroInicio" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
+                <div class="col-span-1 md:col-span-1">
+                    <label for="filtro-data-registro" class="block text-sm font-medium text-gray-700">Data de Registro</label>
+                    <input type="date" id="filtro-data-registro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                 </div>
 
-                <!-- Filtro Data Fim -->
-                <div>
-                    <label for="filterDataConclusaoFim" class="block text-sm font-medium text-gray-700 mb-1">Previsão/Conclusão (Fim)</label>
-                    <input type="date" id="filterDataConclusaoFim" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
+                <div class="col-span-1 md:col-span-1">
+                    <label for="filtro-data-conclusao" class="block text-sm font-medium text-gray-700">Data de Conclusão</label>
+                    <input type="date" id="filtro-data-conclusao" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                 </div>
 
-                <!-- Botão Limpar Filtros -->
-                <button id="limparFiltrosBtn" class="w-full md:w-auto px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 transition duration-150">
-                    Limpar Filtros
-                </button>
-
-                <!-- Botão Extrair Relatório (Acesso direto) -->
-                <button id="extrairRelatorioBtn" class="w-full md:w-auto px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 flex items-center justify-center">
-                    Extrair Relatório ( 📊 )
-                </button>
+                <div class="col-span-1 flex space-x-2">
+                    <button id="btn-limpar-filtros" class="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 transition">
+                        <i class="fas fa-filter"></i> Limpar
+                    </button>
+                </div>
+                
+                <div class="col-span-1 md:col-span-2">
+                    <!-- Botão que aciona o modal de login para exportação. COMPORTAMENTO: Login -> Download XLSX. -->
+                    <button id="btn-exportar-excel" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition">
+                        <i class="fas fa-file-excel"></i> Extrair Relatório Completo
+                    </button>
+                </div>
             </div>
         </section>
 
-        <!-- 3. KANBAN DE PROCESSOS -->
-        <section id="kanban-section" class="bg-white p-6 md:p-8 rounded-xl shadow-md">
-            <h2 class="text-2xl font-extrabold mb-6 text-primary-dark">Kanban de Processos</h2>
+        <!-- SEÇÃO 2: KANBAN DE PROCESSOS (O DASHBOARD QUE DEVE SEMPRE APARECER) -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📈 Kanban de Processos</h2>
+             <!-- Indicador de Carregamento -->
+             <div id="loading-indicator" class="text-center p-6 text-blue-500 font-semibold hidden">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Carregando processos do Firestore...
+            </div>
+            <div id="kanban-board" class="flex overflow-x-auto space-x-4 pb-4">
+                
+                <!-- Coluna 1: Em Tratamento -->
+                <div id="coluna-EmTratamento" class="kanban-column flex-shrink-0 w-80 bg-gray-200 rounded-lg p-3 shadow-inner">
+                    <h3 class="sticky-header text-lg font-bold text-gray-800 bg-gray-200 border-b-2 border-blue-500">Em Tratamento (<span class="process-count">0</span>)</h3>
+                    <div class="kanban-cards-container" data-status="Em Tratamento">
+                        <!-- Cards -->
+                    </div>
+                </div>
 
-            <div id="kanban-board" class="flex overflow-x-auto space-x-6 pb-4">
-                <!-- As colunas serão renderizadas aqui pelo JS -->
+                <!-- Coluna 2: Tratados na Semana -->
+                <div id="coluna-TratadosnaSemana" class="kanban-column flex-shrink-0 w-80 bg-gray-200 rounded-lg p-3 shadow-inner">
+                    <h3 class="sticky-header text-lg font-bold text-gray-800 bg-gray-200 border-b-2 border-yellow-500">Tratados na Semana (<span class="process-count">0</span>)</h3>
+                    <div class="kanban-cards-container" data-status="Tratados na Semana">
+                        <!-- Cards -->
+                    </div>
+                </div>
+
+                <!-- Coluna 3: Próximos Processos -->
+                <div id="coluna-ProximosProcessos" class="kanban-column flex-shrink-0 w-80 bg-gray-200 rounded-lg p-3 shadow-inner">
+                    <h3 class="sticky-header text-lg font-bold text-gray-800 bg-gray-200 border-b-2 border-purple-500">Próximos Processos (<span class="process-count">0</span>)</h3>
+                    <div class="kanban-cards-container" data-status="Próximos Processos">
+                        <!-- Cards -->
+                    </div>
+                </div>
+
+                <!-- Coluna 4: Histórico de Concluídos -->
+                <div id="coluna-HistoricodeConcluidos" class="kanban-column flex-shrink-0 w-80 bg-gray-200 rounded-lg p-3 shadow-inner">
+                    <h3 class="sticky-header text-lg font-bold text-gray-800 bg-gray-200 border-b-2 border-green-500">Histórico de Concluídos (<span class="process-count">0</span>)</h3>
+                    <div class="kanban-cards-container" data-status="Histórico de Concluídos">
+                        <!-- Cards -->
+                    </div>
+                </div>
+
             </div>
         </section>
 
-        <!-- 4. REGISTRAR NOVO PROCESSO (Formulário) -->
-        <section id="register-section" class="bg-white p-6 md:p-8 rounded-xl shadow-md">
-            <h2 class="text-2xl font-extrabold mb-6 flex items-center text-primary-dark">
-                <span class="mr-2">🔥</span> Registrar Novo Processo
-            </h2>
+        <!-- SEÇÃO 3: REGISTRAR NOVO PROCESSO -->
+        <section class="bg-white p-6 rounded-xl shadow-md">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">➕ Registrar Novo Processo</h2>
+            <form id="form-novo-processo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-            <form id="newProcessForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <!-- Colaborador (Select) -->
-                    <div>
-                        <label for="inputColaborador" class="block text-sm font-medium text-gray-700 mb-1">Colaborador</label>
-                        <select id="inputColaborador" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
-                            <!-- Options serão preenchidas via JS -->
-                        </select>
-                        <button type="button" id="manageColaboradoresBtn" class="text-xs text-primary hover:text-indigo-700 mt-1">Gerenciar Colaboradores</button>
-                    </div>
-
-                    <!-- Status do Processo (Select) -->
-                    <div>
-                        <label for="inputStatus" class="block text-sm font-medium text-gray-700 mb-1">Status do Processo</label>
-                        <select id="inputStatus" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
-                            <option value="Em Tratamento">Em Tratamento</option>
-                            <option value="Tratados na semana">Tratados na semana</option>
-                            <option value="Próximos Processos">Próximos Processos</option>
-                            <option value="Histórico de Concluídos">Histórico de Concluídos</option>
-                        </select>
-                    </div>
-
-                    <!-- Data de Registro (Cadastro) -->
-                    <div>
-                        <label for="inputDataRegistro" class="block text-sm font-medium text-gray-700 mb-1">Data de Registro (Inclusão)</label>
-                        <input type="date" id="inputDataRegistro" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
-                    </div>
-
-                    <!-- Data de Previsão (Opcional) -->
-                    <div>
-                        <label for="inputDataPrevisao" class="block text-sm font-medium text-gray-700 mb-1">Data de Previsão (Opcional)</label>
-                        <input type="date" id="inputDataPrevisao" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
-                    </div>
-
-                    <!-- Data de Conclusão (Opcional, se JÁ feito) -->
-                    <div class="p-2 border border-green-300 bg-green-50 rounded-lg">
-                        <label for="inputDataConclusao" class="block text-sm font-medium text-green-700 mb-1 flex items-center">
-                            <span class="mr-1">⭐</span> Data de Conclusão (Opcional, se JÁ feito)
-                        </label>
-                        <input type="date" id="inputDataConclusao" class="w-full border-green-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-2">
-                    </div>
+                <!-- Colaborador (Obrigatório) -->
+                <div class="col-span-full sm:col-span-1">
+                    <label for="colaborador-select" class="block text-sm font-medium text-gray-700">Colaborador <span class="text-red-500">*</span></label>
+                    <select id="colaborador-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5" required>
+                        <option value="" disabled selected>Selecione ou Gerencie</option>
+                        <option value="gerenciar-colaboradores">✨ Gerenciar Colaboradores...</option>
+                    </select>
                 </div>
 
-                <!-- Título do Processo/Tarefa -->
-                <div>
-                    <label for="inputTitulo" class="block text-sm font-medium text-gray-700 mb-1">Nome do Processo/Tarefa</label>
-                    <input type="text" id="inputTitulo" placeholder="Ex: Fechamento mensal Cliente Alpha" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2">
+                <!-- Status do Processo (Obrigatório) -->
+                <div class="col-span-full sm:col-span-1">
+                    <label for="status-processo" class="block text-sm font-medium text-gray-700">Status do Processo <span class="text-red-500">*</span></label>
+                    <select id="status-processo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5" required>
+                        <option value="Em Tratamento">Em Tratamento</option>
+                        <option value="Tratados na Semana">Tratados na Semana</option>
+                        <option value="Próximos Processos">Próximos Processos</option>
+                        <option value="Histórico de Concluídos">Histórico de Concluídos</option>
+                    </select>
+                </div>
+                
+                <!-- Data de Registro (Obrigatório) -->
+                <div class="col-span-full sm:col-span-1">
+                    <label for="data-registro" class="block text-sm font-medium text-gray-700">Data de Registro (Cadastro) <span class="text-red-500">*</span></label>
+                    <input type="date" id="data-registro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5" required>
                 </div>
 
-                <!-- Observações/Detalhes -->
-                <div>
-                    <label for="inputObservacoes" class="block text-sm font-medium text-gray-700 mb-1">Detalhes/Descrição</label>
-                    <textarea id="inputObservacoes" rows="4" placeholder="O que está sendo feito ou o que foi/será feito..." class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary p-2"></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Dica: Use hífens (-) ou asteriscos (*) para simular tópicos (bullets).</p>
+                <!-- Data de Previsão de Conclusão (AGORA OPCIONAL) -->
+                <div class="col-span-full sm:col-span-1">
+                    <label for="data-previsao" class="block text-sm font-medium text-gray-700">Data de Previsão de Conclusão (Opcional)</label>
+                    <input type="date" id="data-previsao" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5">
                 </div>
 
-                <!-- Botão Incluir Processo -->
-                <div class="text-right">
-                    <button type="submit" id="adicionarProcessoBtn" class="px-8 py-3 bg-primary text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-150">
-                        Adicionar Processo
+                <!-- Data de Conclusão (Opcional) -->
+                <div class="col-span-full sm:col-span-1">
+                    <label for="data-conclusao" class="block text-sm font-medium text-gray-700">Data de Conclusão (Opcional)</label>
+                    <input type="date" id="data-conclusao" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5">
+                </div>
+
+                <!-- Título do Processo/Tarefa (Obrigatório) -->
+                <div class="col-span-full sm:col-span-1">
+                    <label for="titulo-processo" class="block text-sm font-medium text-gray-700">Título do Processo/Tarefa <span class="text-red-500">*</span></label>
+                    <input type="text" id="titulo-processo" placeholder="Ex: Revisão de Contrato X - Cliente Alfa" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5" required>
+                </div>
+
+                <!-- Observações -->
+                <div class="col-span-full">
+                    <label for="observacoes" class="block text-sm font-medium text-gray-700">Observações (Use quebras de linha/tópicos)</label>
+                    <textarea id="observacoes" rows="3" placeholder="Ex: - Ponto 1: Verificar cláusula 5; - Ponto 2: Enviar para aprovação da Dra. Cássia." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5"></textarea>
+                </div>
+
+                <!-- Botão de Inclusão -->
+                <div class="col-span-full pt-4">
+                    <button type="submit" id="btn-incluir-processo" class="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition">
+                        <i class="fas fa-plus-circle"></i> Incluir Processo
                     </button>
                 </div>
             </form>
         </section>
     </main>
 
-    <!-- Script de Lógica LocalStorage -->
-    <script>
-        // --- Variáveis de Configuração e Estado ---
-        
-        // Chaves do LocalStorage
-        const LS_PROCESSES_KEY = 'kanbanProcesses';
-        const LS_COLABORADORES_KEY = 'kanbanColaboradores';
-        
-        // Credenciais de Acesso Administrador (Simuladas)
-        const ADMIN_CREDENTIALS = [
-            { login: 'Dra. Cássia', senha: '1234$C' },
-            { login: 'Dra. Janaína', senha: '5678$J' }
-        ];
+<script type="module">
+    // --- Configuração e Variáveis Globais (Firebase) ---
 
-        window.COLABORADORES_INICIAIS = [
-            'Beatriz', 'Diego', 'Emily', 'Felipe', 'João', 'Jessica', 'José', 'Giovana', 'Mariane', 'Rebeca', 'Tairane', 'Thais'
-        ];
+    // IMPORTAÇÕES DO FIREBASE (necessário ser 'type="module"')
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    
+    // Variáveis Globais fornecidas pelo ambiente
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        window.STATUS_COLUMNS = [
-            'Em Tratamento',
-            'Tratados na semana',
-            'Próximos Processos',
-            'Histórico de Concluídos'
-        ];
-        
-        // Dados locais
-        window.processes = [];
-        window.colaboradoresList = [];
-        
-        window.flashInterval = null;
+    let db;
+    let auth;
+    let userId = null;
+    let processos = []; // O array de processos agora será preenchido pelo Firestore
+    let isAuthReady = false; // Flag para garantir que só tentemos operações após a autenticação
 
-        // --- Funções de LocalStorage ---
+    // Definição da Collection Path para dados PÚBLICOS e colaborativos
+    const getProcessosCollectionPath = () => `/artifacts/${appId}/public/data/processes`;
 
-        /**
-         * Carrega dados do LocalStorage.
-         */
-        function loadData(key, defaultValue) {
-            try {
-                const data = localStorage.getItem(key);
-                return data ? JSON.parse(data) : defaultValue;
-            } catch (e) {
-                console.error(`Erro ao carregar dados da chave ${key}:`, e);
-                return defaultValue;
-            }
+    // --- Configurações Locais ---
+    const USUARIOS_AUTORIZADOS = {
+        'Dra. Cássia': '1234$C',
+        'Dra. Janaína': '5678$J'
+    };
+
+    let colaboradores = [
+        'Beatriz', 'Diego', 'Emily', 'Felipe', 'João', 'Jessica',
+        'José', 'Giovana', 'Mariane', 'Rebeca', 'Tairane', 'Thais'
+    ];
+    
+    // Chave de localStorage para colaboradores (mantida local para simplificar a gestão de permissões)
+    const LS_COLABORADORES = 'dashboardColaboradores';
+
+    // Elementos do DOM
+    const kanbanBoard = document.getElementById('kanban-board');
+    const formNovoProcesso = document.getElementById('form-novo-processo');
+    const colaboradorSelect = document.getElementById('colaborador-select');
+    const filtroColaboradorSelect = document.getElementById('filtro-colaborador');
+    const btnExportarExcel = document.getElementById('btn-exportar-excel');
+    const btnLimparFiltros = document.getElementById('btn-limpar-filtros');
+    const filtroDataRegistro = document.getElementById('filtro-data-registro');
+    const filtroDataConclusao = document.getElementById('filtro-data-conclusao');
+    const loadingIndicator = document.getElementById('loading-indicator');
+
+
+    // --- Funções de Inicialização e Autenticação (FIREBASE) ---
+
+    async function inicializarFirebase() {
+        if (Object.keys(firebaseConfig).length === 0) {
+            console.error("Configuração do Firebase não encontrada.");
+            return;
         }
 
-        /**
-         * Salva dados no LocalStorage.
-         */
-        function saveData(key, data) {
-            try {
-                localStorage.setItem(key, JSON.stringify(data));
-                window.updateStatus('Dados salvos localmente', false);
-            } catch (e) {
-                console.error(`Erro ao salvar dados na chave ${key}:`, e);
-                window.updateStatus('Erro ao salvar dados locais', false);
-            }
-        }
+        try {
+            // 1. Inicializa o App e Serviços
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            setLogLevel('debug'); // Ativa o log para ver as operações do Firestore
 
-        /**
-         * Gera um ID simples (simulando ID de documento).
-         */
-        function generateUniqueId() {
-            return 'proc_' + Date.now() + Math.random().toString(36).substring(2, 9);
-        }
-
-        // --- Funções de UI (Definidas globalmente para acesso nos listeners) ---
-
-        /**
-         * Atualiza o indicador de status.
-         */
-        function updateStatus(message, isLoading = true) {
-            const indicator = document.getElementById('status-indicator');
-            const messageEl = document.getElementById('status-message');
-            const spinner = indicator.querySelector('.loading-spinner');
-            
-            messageEl.textContent = message;
-            
-            if (isLoading) {
-                indicator.classList.remove('hidden');
-                spinner.classList.remove('hidden');
-                indicator.classList.remove('bg-green-100', 'text-green-800');
-                indicator.classList.add('bg-indigo-100', 'text-indigo-800');
+            // 2. Tenta autenticar
+            if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken);
             } else {
-                spinner.classList.add('hidden');
-                indicator.classList.remove('bg-indigo-100', 'text-indigo-800');
-                indicator.classList.add('bg-green-100', 'text-green-800');
-                // Esconde após um breve período para indicar sucesso
-                setTimeout(() => indicator.classList.add('hidden'), 3000);
-            }
-        }
-        window.updateStatus = updateStatus;
-        
-        /**
-         * Funções de Modal (showModal, closeModal, showModalMessage, showConfirmationModal) 
-         */
-        window.modalContainer = document.getElementById('modal-container');
-        window.modalContent = document.getElementById('modal-content');
-
-        window.showModal = function(content, isWide = false) {
-            window.modalContent.innerHTML = content;
-            // Ajusta a largura do modal se for o dashboard
-            if (isWide) {
-                window.modalContent.classList.remove('max-w-md');
-                window.modalContent.classList.add('max-w-4xl');
-            } else {
-                window.modalContent.classList.remove('max-w-4xl');
-                window.modalContent.classList.add('max-w-md');
-            }
-            window.modalContainer.classList.remove('hidden');
-            window.modalContainer.classList.add('flex');
-        };
-
-        window.closeModal = function() {
-            window.modalContainer.classList.add('hidden');
-            window.modalContainer.classList.remove('flex');
-        };
-
-        window.showModalMessage = function(message, type) {
-            // Lógica de modal de mensagem
-            let bgColor, textColor, icon;
-            switch (type) {
-                case 'success': bgColor = 'bg-green-100 border-green-400'; textColor = 'text-green-700'; icon = '✅'; break;
-                case 'error': bgColor = 'bg-red-100 border-red-400'; textColor = 'text-red-700'; icon = '❌'; break;
-                default: bgColor = 'bg-blue-100 border-blue-400'; textColor = 'text-blue-700'; icon = 'ℹ️';
-            }
-            const content = `
-                <div class="p-4 border-l-4 ${bgColor} rounded-lg" role="alert">
-                    <div class="flex items-center">
-                        <div class="text-xl mr-3">${icon}</div>
-                        <p class="font-bold ${textColor}">${message}</p>
-                    </div>
-                    <div class="mt-4 text-right">
-                        <button onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">OK</button>
-                    </div>
-                </div>
-            `;
-            window.showModal(content);
-        };
-
-        window.showConfirmationModal = function(message, callback) {
-            const content = `
-                <div class="p-4 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg" role="alert">
-                    <p class="font-bold text-yellow-800 mb-4">${message}</p>
-                    <div class="flex justify-end space-x-3">
-                        <button onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
-                        <button id="confirmActionBtn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Confirmar</button>
-                    </div>
-                </div>
-            `;
-            window.showModal(content);
-            document.getElementById('confirmActionBtn').onclick = () => {
-                callback();
-                window.closeModal();
-            };
-        };
-
-        // --- Funções de Utilidade (formatDate, daysDifference, isWithinLast7Days, etc.) ---
-        
-        window.formatDate = function(dateString) {
-            if (!dateString) return 'Indefinida';
-            try {
-                // Se a string já estiver no formato AAAA-MM-DD
-                if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                    const [year, month, day] = dateString.split('-');
-                    return `${day}/${month}/${year}`;
-                }
-                // Tenta formatar a partir de um objeto Date ou string de data mais complexa
-                const date = new Date(dateString);
-                if (isNaN(date)) return dateString;
-                return date.toLocaleDateString('pt-BR');
-            } catch (e) {
-                return dateString;
-            }
-        };
-
-        window.daysDifference = function(date1, date2) {
-            const timeDiff = date1.getTime() - date2.getTime();
-            return Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-        };
-
-        window.isWithinLast7Days = function(dateString) {
-            if (!dateString) return false;
-            
-            const processDate = new Date(dateString + 'T00:00:00');
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const sevenDaysAgo = new Date(today);
-            sevenDaysAgo.setDate(today.getDate() - 7);
-            
-            // Verifica se a data do processo é >= que 7 dias atrás E <= hoje
-            return processDate >= sevenDaysAgo && processDate <= today;
-        };
-
-        window.getStatusBorderColor = function(status) {
-            switch (status) {
-                case 'Em Tratamento': return 'border-orange-500';
-                case 'Tratados na semana': return 'border-green-500';
-                case 'Próximos Processos': return 'border-indigo-500';
-                case 'Histórico de Concluídos': return 'border-gray-500';
-                default: return 'border-gray-300';
-            }
-        };
-        
-        // Novo: Função para obter a cor de fundo customizada para a coluna
-        window.getColumnBgClass = function(status) {
-            switch (status) {
-                case 'Em Tratamento': return 'bg-column-tratamento';
-                case 'Tratados na semana': return 'bg-column-tratados';
-                case 'Próximos Processos': return 'bg-column-proximos';
-                case 'Histórico de Concluídos': return 'bg-column-historico';
-                default: return 'bg-gray-100';
-            }
-        };
-
-        window.setupFlashEffect = function() {
-            if (window.flashInterval) {
-                clearInterval(window.flashInterval);
-            }
-            window.flashInterval = setInterval(() => {
-                document.querySelectorAll('.blink-alert').forEach(card => {
-                    card.classList.toggle('bg-red-500/10');
-                });
-            }, 1000);
-        };
-
-        // --- Funções de Renderização e Lógica (kanban.js) ---
-
-        /**
-         * Cria o HTML de um card de processo.
-         */
-        window.createProcessCard = function(processo) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            let isAlert = false;
-            let diffDays = Infinity;
-            
-            if (processo.dataPrevisao && processo.status !== 'Histórico de Concluídos') {
-                const targetDate = new Date(processo.dataPrevisao + 'T00:00:00');
-                diffDays = window.daysDifference(targetDate, today);
-                
-                // Alerta se faltam 2 dias ou menos (incluindo hoje)
-                if (diffDays >= 0 && diffDays <= 2) {
-                    isAlert = true;
-                }
+                await signInAnonymously(auth);
             }
 
-            const alertClasses = isAlert ? 'blink-alert border-red-500' : 'border-gray-200 hover:shadow-xl';
-
-            return `
-                <div id="process-${processo.id}" data-status="${processo.status}"
-                     class="bg-white p-4 rounded-lg shadow-md mb-4 transition duration-300 ${alertClasses}">
+            // 3. Listener de Estado de Autenticação
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    isAuthReady = true;
+                    document.getElementById('auth-status').textContent = `Usuário ID: ${userId}`;
                     
-                    <div class="flex justify-between items-start mb-2">
-                        <h4 class="font-semibold text-gray-800 text-sm">${processo.titulo}</h4>
-                        <div class="flex text-gray-500 space-x-2">
-                            <span class="icon-edit" onclick="window.openEditModal('${processo.id}')" title="Editar"></span>
-                            <span class="icon-delete" onclick="window.deleteProcess('${processo.id}')" title="Excluir"></span>
-                        </div>
-                    </div>
-                    
-                    <p class="text-xs text-gray-600 mb-1"><span class="font-medium">Colab:</span> ${processo.colaborador}</p>
-                    <p class="text-xs text-gray-600 mb-1"><span class="font-medium">Registro:</span> ${window.formatDate(processo.dataRegistro)}</p>
-                    <div class="text-xs ${isAlert ? 'text-red-600 font-bold' : 'text-gray-600'}">
-                        <span class="font-medium">Prev.:</span> ${window.formatDate(processo.dataPrevisao)}
-                        ${isAlert ? ` (Vence em ${diffDays} dias)` : ''}
-                    </div>
-
-                    ${processo.dataConclusao ? `
-                        <p class="text-xs text-green-600 mt-1 font-medium">
-                            <span class="mr-1">✅</span> Concluído: ${window.formatDate(processo.dataConclusao)}
-                        </p>` : ''
-                    }
-
-                    <div class="mt-2 text-xs text-gray-500 border-t pt-2 overflow-hidden max-h-16">
-                        ${processo.observacoes ? processo.observacoes.replace(/\n/g, '<br>') : 'Sem observações.'}
-                    </div>
-                </div>
-            `;
-        };
-
-        /**
-         * Renderiza todo o Kanban (colunas e cards).
-         */
-        window.renderKanban = function(filteredProcesses = window.processes) {
-            const kanbanBoard = document.getElementById('kanban-board');
-            if (!kanbanBoard) return;
-            
-            kanbanBoard.innerHTML = '';
-            
-            const kanbanMap = window.STATUS_COLUMNS.reduce((acc, status) => {
-                acc[status] = [];
-                return acc;
-            }, {});
-
-            filteredProcesses.forEach(p => {
-                if (p && p.status && kanbanMap.hasOwnProperty(p.status)) {
-                    kanbanMap[p.status].push(p);
-                }
-            });
-
-            window.STATUS_COLUMNS.forEach(status => {
-                const columnTitle = status;
-                const cardList = kanbanMap[status];
-                const columnBgClass = window.getColumnBgClass(status); // Novo: Cor de fundo da coluna
-
-                const columnDiv = document.createElement('div');
-                columnDiv.className = 'kanban-column flex-shrink-0';
-                columnDiv.innerHTML = `
-                    <!-- Header da Coluna -->
-                    <div class="sticky top-0 z-10 p-3 shadow-md border-b-2 ${window.getStatusBorderColor(status)} ${columnBgClass} rounded-t-lg">
-                        <h3 class="font-bold text-lg text-primary-dark">${columnTitle}</h3>
-                        <span class="text-xs text-gray-600">${cardList.length} processos</span>
-                    </div>
-                    <!-- Cards da Coluna -->
-                    <div class="kanban-cards p-2 pt-4 ${columnBgClass} rounded-b-lg flex-grow">
-                        ${cardList.map(window.createProcessCard).join('')}
-                    </div>
-                `;
-                kanbanBoard.appendChild(columnDiv);
-            });
-
-            window.setupFlashEffect();
-        };
-
-        /**
-         * Aplica os filtros e renderiza o Kanban.
-         */
-        window.applyFilters = function() {
-            const colaborador = document.getElementById('filterColaborador')?.value;
-            const dataInicioStr = document.getElementById('filterDataRegistroInicio')?.value;
-            const dataFimStr = document.getElementById('filterDataConclusaoFim')?.value;
-
-            const filtered = window.processes.filter(p => {
-                const colaboradorMatch = colaborador === 'todos' || p.colaborador === colaborador;
-                
-                let dataInicioMatch = true;
-                if (dataInicioStr) {
-                    dataInicioMatch = p.dataRegistro >= dataInicioStr;
-                }
-
-                let dataFimMatch = true;
-                if (dataFimStr) {
-                    const processDate = p.dataConclusao || p.dataPrevisao;
-                    if (processDate) {
-                        dataFimMatch = processDate <= dataFimStr;
-                    } else {
-                        // Se o filtro Fim for setado e o processo não tiver data de Previsão nem Conclusão, não corresponde.
-                        dataFimMatch = false; 
-                    }
-                }
-
-                return colaboradorMatch && dataInicioMatch && dataFimMatch;
-            });
-
-            window.renderKanban(filtered);
-        };
-
-        /**
-         * Preenche os selects de colaborador (filtros e registro).
-         */
-        window.fillColaboradorSelects = function(list = window.colaboradoresList) {
-            // Busca todos os selects com o ID de colaborador (tanto no form principal quanto no modal de edição)
-            const selects = [
-                document.getElementById('filterColaborador'),
-                ...Array.from(document.querySelectorAll('#inputColaborador'))
-            ].filter(el => el);
-
-            selects.forEach(select => {
-                const isFilter = select.id === 'filterColaborador';
-                const selectedValue = select.value;
-                select.innerHTML = '';
-
-                if (isFilter) {
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = 'todos';
-                    defaultOption.textContent = 'Todos os Colaboradores';
-                    select.appendChild(defaultOption);
-                }
-
-                list.sort().forEach(colaborador => {
-                    const option = document.createElement('option');
-                    option.value = colaborador;
-                    option.textContent = colaborador;
-                    select.appendChild(option);
-                });
-                
-                // Tenta restaurar o valor selecionado
-                if (select.querySelector(`option[value="${selectedValue}"]`)) {
-                    select.value = selectedValue;
-                } else if (!isFilter) {
-                    // Seleciona o primeiro, se não for o filtro e nada foi selecionado antes
-                    select.value = list.length > 0 ? list.sort()[0] : '';
-                }
-            });
-        };
-        
-        // --- Funções de CRUD (LocalStorage) ---
-
-        /**
-         * Salva (Adiciona/Edita) um processo no LocalStorage.
-         */
-        window.handleProcessSubmit = async function(event, processId = null) {
-            event.preventDefault();
-            
-            const form = event.target;
-            
-            const processData = {
-                // Pega os valores do formulário submetido (event.target)
-                colaborador: form.querySelector('#inputColaborador').value,
-                status: form.querySelector('#inputStatus').value,
-                dataRegistro: form.querySelector('#inputDataRegistro').value,
-                dataPrevisao: form.querySelector('#inputDataPrevisao').value || null,
-                dataConclusao: form.querySelector('#inputDataConclusao').value || null,
-                titulo: form.querySelector('#inputTitulo').value,
-                observacoes: form.querySelector('#inputObservacoes').value,
-                updatedAt: new Date().toISOString(),
-            };
-            
-            window.updateStatus('Salvando processo...', true);
-
-            try {
-                if (processId) {
-                    // Edição
-                    const index = window.processes.findIndex(p => p.id === processId);
-                    if (index !== -1) {
-                        window.processes[index] = { ...window.processes[index], ...processData };
-                        window.showModalMessage('Processo editado com sucesso!', 'success');
-                    }
+                    // Inicia a escuta dos dados após a autenticação
+                    ouvirProcessos(); 
                 } else {
-                    // Novo Processo
-                    const newProcess = {
-                        id: generateUniqueId(),
-                        ...processData,
-                        createdAt: new Date().toISOString()
-                    };
-                    window.processes.push(newProcess);
-                    form.reset();
-                    // Garante que a data de registro volte para hoje após o reset
-                    document.getElementById('inputDataRegistro').valueAsDate = new Date(); 
-                    window.showModalMessage('Novo processo registrado com sucesso!', 'success');
+                    userId = null;
+                    isAuthReady = false;
+                    document.getElementById('auth-status').textContent = 'Usuário: Desconectado';
                 }
-                
-                saveData(LS_PROCESSES_KEY, window.processes);
-                window.renderKanban();
+            });
 
-            } catch (e) {
-                console.error("Erro ao salvar processo localmente:", e);
-                window.showModalMessage(`Erro ao salvar: ${e.message}`, 'error');
-            } finally {
-                window.updateStatus('Salvo localmente', false);
+        } catch (error) {
+            console.error("Erro na inicialização ou autenticação do Firebase:", error);
+            document.getElementById('auth-status').textContent = 'Erro de Conexão com Firebase';
+        }
+    }
+
+    // --- Funções de Persistência (FIREBASE & LocalStorage para Colaboradores) ---
+
+    function carregarColaboradores() {
+        try {
+            const colaboradoresSalvos = localStorage.getItem(LS_COLABORADORES);
+            if (colaboradoresSalvos) {
+                colaboradores = JSON.parse(colaboradoresSalvos);
             }
+        } catch (error) {
+            console.error("Erro ao carregar colaboradores do localStorage:", error);
+        }
+    }
+
+    function salvarColaboradores() {
+        localStorage.setItem(LS_COLABORADORES, JSON.stringify(colaboradores));
+        renderizarSelects(); // Atualiza os selects após salvar
+    }
+    
+    /**
+     * Usa onSnapshot para escutar mudanças em tempo real no Firestore.
+     */
+    function ouvirProcessos() {
+        loadingIndicator.classList.remove('hidden');
+        if (!db || !isAuthReady) return;
+
+        const colRef = collection(db, getProcessosCollectionPath());
+        
+        // Ativa o listener em tempo real
+        onSnapshot(colRef, (snapshot) => {
+            const processosFirestore = [];
+            snapshot.forEach(doc => {
+                // Mapeia o documento do Firestore, adicionando o ID
+                processosFirestore.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Atualiza o array global de processos
+            processos = processosFirestore;
+            console.log("Processos carregados do Firestore:", processos.length);
+
+            // Re-renderiza o Kanban com a nova lista (aplicando filtros, se houver)
+            renderizarKanban(aplicarFiltros(processos));
+            loadingIndicator.classList.add('hidden');
+        }, (error) => {
+            console.error("Erro ao escutar processos do Firestore:", error);
+            loadingIndicator.classList.add('hidden');
+            Swal.fire('Erro de Sincronização', 'Não foi possível carregar os dados em tempo real. Verifique o console.', 'error');
+        });
+    }
+
+
+    // --- Renderização de UI ---
+
+    function renderizarSelects() {
+        // Renderiza no Formulário de Registro
+        colaboradorSelect.innerHTML = '<option value="" disabled selected>Selecione</option><option value="gerenciar-colaboradores">✨ Gerenciar Colaboradores...</option>';
+        // Renderiza no Filtro
+        filtroColaboradorSelect.innerHTML = '<option value="">Todos</option>';
+
+        colaboradores.sort().forEach(nome => {
+            const option = document.createElement('option');
+            option.value = nome;
+            option.textContent = nome;
+            colaboradorSelect.appendChild(option.cloneNode(true));
+            filtroColaboradorSelect.appendChild(option);
+        });
+    }
+
+    function renderizarKanban(listaProcessos = processos) {
+        // Limpa todas as colunas
+        document.querySelectorAll('.kanban-cards-container').forEach(container => container.innerHTML = '');
+
+        const contadores = {
+            'Em Tratamento': 0,
+            'Tratados na Semana': 0,
+            'Próximos Processos': 0,
+            'Histórico de Concluídos': 0
         };
 
-        /**
-         * Exclui um processo do LocalStorage.
-         */
-        window.deleteProcess = function(processId) {
-            window.showConfirmationModal('Tem certeza que deseja excluir este processo?', () => {
-                window.updateStatus('Excluindo processo...', true);
+        listaProcessos.forEach(processo => {
+            const card = criarCardProcesso(processo);
+            const container = document.querySelector(`.kanban-cards-container[data-status="${processo.status}"]`);
+            if (container) {
+                container.appendChild(card);
+                contadores[processo.status]++;
+            }
+        });
+        
+        // Atualiza os contadores no cabeçalho
+        document.getElementById('coluna-EmTratamento').querySelector('.process-count').textContent = contadores['Em Tratamento'];
+        document.getElementById('coluna-TratadosnaSemana').querySelector('.process-count').textContent = contadores['Tratados na Semana'];
+        document.getElementById('coluna-ProximosProcessos').querySelector('.process-count').textContent = contadores['Próximos Processos'];
+        document.getElementById('coluna-HistoricodeConcluidos').querySelector('.process-count').textContent = contadores['Histórico de Concluídos'];
+        
+        // Aplica o Drag and Drop após renderizar
+        adicionarListenersDragAndDrop();
+    }
+
+    function criarCardProcesso(processo) {
+        const card = document.createElement('div');
+        // Usa o ID do documento do Firestore como ID do Card
+        card.id = `card-${processo.id}`; 
+        card.className = 'kanban-card p-4 bg-white rounded-lg shadow-md mb-3 border-l-4 border-blue-400 hover:shadow-lg transition cursor-move';
+        card.setAttribute('draggable', true);
+        card.setAttribute('data-id', processo.id);
+        
+        // Verifica se o processo foi concluído (se tem data de conclusão)
+        const isConcluido = !!processo.dataConclusao;
+        
+        // Somente calcula urgência se o processo não estiver concluído e tiver uma data de previsão
+        if (!isConcluido && processo.dataPrevisao) {
+            const hoje = new Date();
+            const dataPrevisao = new Date(processo.dataPrevisao);
+            
+            hoje.setHours(0, 0, 0, 0); 
+            
+            const diferencaDias = Math.ceil((dataPrevisao.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diferencaDias >= 0 && diferencaDias <= 2) {
+                card.classList.add('alert-blink', 'border-red-600');
+            } else if (diferencaDias < 0) {
+                card.classList.remove('border-blue-400');
+                card.classList.add('border-red-600'); 
+            }
+        }
+        
+        const dataConc = isConcluido ? `Concluído: ${processo.dataConclusao}` : 'Aguardando Conclusão';
+        const dataPrevDisplay = processo.dataPrevisao ? processo.dataPrevisao : 'N/A';
+
+        card.innerHTML = `
+            <div class="font-bold text-gray-800">${processo.titulo}</div>
+            <div class="text-xs text-gray-500 mt-1">Colab: ${processo.colaborador}</div>
+            <div class="text-xs text-gray-500">Reg: ${processo.dataRegistro} | Prev: <span class="font-semibold">${dataPrevDisplay}</span></div>
+            <div class="text-xs text-gray-500">${dataConc}</div>
+            <div class="mt-3 flex justify-end space-x-2">
+                <button onclick="window.editarProcesso('${processo.id}')" class="text-blue-500 hover:text-blue-700 text-sm transition"><i class="fas fa-edit"></i> Editar</button>
+                <button onclick="window.excluirProcesso('${processo.id}')" class="text-red-500 hover:text-red-700 text-sm transition"><i class="fas fa-trash"></i> Excluir</button>
+            </div>
+        `;
+        return card;
+    }
+
+    // --- Funções de Gerenciamento de Processos (CRUD - FIREBASE) ---
+
+    async function adicionarNovoProcesso(e) {
+        e.preventDefault();
+        
+        if (!isAuthReady) {
+            Swal.fire('Erro', 'Aguarde a conexão com o banco de dados antes de adicionar.', 'error');
+            return;
+        }
+
+        if (colaboradorSelect.value === 'gerenciar-colaboradores') {
+            abrirModalColaboradores();
+            return;
+        }
+
+        const novoProcesso = {
+            colaborador: colaboradorSelect.value,
+            status: document.getElementById('status-processo').value,
+            dataRegistro: document.getElementById('data-registro').value,
+            dataPrevisao: document.getElementById('data-previsao').value || null, 
+            dataConclusao: document.getElementById('data-conclusao').value || null,
+            titulo: document.getElementById('titulo-processo').value,
+            observacoes: document.getElementById('observacoes').value,
+            // Metadados importantes para o Firestore:
+            createdAt: new Date().toISOString(),
+            createdBy: userId 
+        };
+
+        if (!novoProcesso.colaborador || !novoProcesso.status || !novoProcesso.dataRegistro || !novoProcesso.titulo) {
+            Swal.fire('Erro', 'Por favor, preencha os campos obrigatórios (marcados com *)', 'error');
+            return;
+        }
+
+        try {
+            // Usa addDoc para adicionar um novo documento com ID gerado automaticamente
+            await addDoc(collection(db, getProcessosCollectionPath()), novoProcesso);
+            
+            Swal.fire('Sucesso!', 'Novo processo registrado com sucesso e sincronizado!', 'success');
+            formNovoProcesso.reset();
+            document.getElementById('data-registro').valueAsDate = new Date(); // Mantém a data de hoje
+        } catch (error) {
+            console.error("Erro ao adicionar processo ao Firestore:", error);
+            Swal.fire('Erro de Gravação', 'Não foi possível salvar o processo. Verifique as permissões.', 'error');
+        }
+    }
+
+    // Função global para ser chamada pelo HTML
+    window.excluirProcesso = async function(id) {
+        if (!isAuthReady) {
+            Swal.fire('Erro', 'Aguarde a conexão com o banco de dados.', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Tem certeza?',
+            text: "Esta ação apagará o processo para todos os colaboradores!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, excluir!',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
                 try {
-                    window.processes = window.processes.filter(p => p.id !== processId);
-                    saveData(LS_PROCESSES_KEY, window.processes);
-                    window.renderKanban();
-                    window.showModalMessage('Processo excluído com sucesso.', 'success');
-                } catch (e) {
-                    console.error("Erro ao excluir processo:", e);
-                    window.showModalMessage(`Erro ao excluir: ${e.message}`, 'error');
-                } finally {
-                    window.updateStatus('Salvo localmente', false);
+                    // Usa deleteDoc para remover o documento
+                    await deleteDoc(doc(db, getProcessosCollectionPath(), id));
+                    Swal.fire('Excluído!', 'O processo foi excluído e removido para todos.', 'success');
+                    // O onSnapshot cuidará da remoção na UI
+                } catch (error) {
+                    console.error("Erro ao excluir processo do Firestore:", error);
+                    Swal.fire('Erro', 'Não foi possível excluir o processo. Verifique as permissões.', 'error');
                 }
-            });
-        };
-
-        // --- Funções de Gerenciamento de Colaboradores (LocalStorage) ---
-
-        /**
-         * Salva a lista atual de colaboradores no LocalStorage e atualiza selects.
-         */
-        function saveColaboradoresList() {
-            saveData(LS_COLABORADORES_KEY, window.colaboradoresList);
-            window.fillColaboradorSelects();
-        }
-        
-        /**
-         * Adiciona um novo colaborador.
-         */
-        window.addColaborador = function(newName) {
-            newName = newName.trim();
-            if (newName && !window.colaboradoresList.includes(newName)) {
-                window.colaboradoresList.push(newName);
-                saveColaboradoresList();
-                // Recarrega o modal para atualizar a lista visível e limpar o campo de entrada
-                window.openManageColaboradoresModal(); 
-            } else if (window.colaboradoresList.includes(newName)) {
-                window.showModalMessage('Colaborador já existe!', 'error');
-            } else {
-                 window.showModalMessage('Nome do colaborador não pode estar vazio.', 'error');
             }
-        };
+        });
+    }
 
-        /**
-         * Remove um colaborador.
-         */
-        window.removeColaborador = function(nameToRemove) {
-            window.colaboradoresList = window.colaboradoresList.filter(name => name !== nameToRemove);
-            saveColaboradoresList();
-            window.openManageColaboradoresModal(); // Recarrega o modal
-            
-            // Atualiza os processos associados ao colaborador removido
-            window.processes.forEach(p => {
-                if (p.colaborador === nameToRemove) {
-                    p.colaborador = 'Removido/Ex-colaborador';
-                }
-            });
-            saveData(LS_PROCESSES_KEY, window.processes);
-            window.renderKanban();
-        };
+    // Função global para ser chamada pelo HTML
+    window.editarProcesso = function(id) {
+        const processo = processos.find(p => p.id === id);
+        if (!processo) return;
 
-        // --- Lógica de Modais de Edição e Gerenciamento ---
-
-        window.openEditModal = function(processId) {
-            const processToEdit = window.processes.find(p => p.id === processId);
-            if (!processToEdit) return;
-
-            // 1. Injeta a estrutura do formulário principal no modal, usando o innerHTML.
-            const mainFormInnerHtml = document.getElementById('newProcessForm').innerHTML;
-
-            window.showModal(`
-                <h3 class="text-xl font-bold mb-4">Editar Processo: ${processToEdit.titulo}</h3>
-                <form id="editProcessForm" class="space-y-4">
-                    ${mainFormInnerHtml} 
-                </form>
-                <div class="mt-4 text-right">
-                    <button onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
-                </div>
-            `);
-            
-            // Pega a referência para o novo formulário no DOM
-            const editForm = document.getElementById('editProcessForm');
-            if (!editForm) return;
-
-            // 2. Garante que o select do colaborador esteja preenchido COM AS OPÇÕES PRIMEIRO.
-            window.fillColaboradorSelects();
-            
-            // 3. Preenche os dados existentes
-            editForm.querySelector('#inputColaborador').value = processToEdit.colaborador || '';
-            editForm.querySelector('#inputStatus').value = processToEdit.status || '';
-            editForm.querySelector('#inputDataRegistro').value = processToEdit.dataRegistro || '';
-            editForm.querySelector('#inputDataPrevisao').value = processToEdit.dataPrevisao || '';
-            editForm.querySelector('#inputDataConclusao').value = processToEdit.dataConclusao || '';
-            editForm.querySelector('#inputTitulo').value = processToEdit.titulo || '';
-            editForm.querySelector('#inputObservacoes').value = processToEdit.observacoes || '';
-            
-            // Ajusta o texto e remove o botão de gerenciar colaboradores (dentro do novo form)
-            editForm.querySelector('#adicionarProcessoBtn').textContent = 'Salvar Edição';
-            editForm.querySelector('#manageColaboradoresBtn')?.remove();
-
-            // Adiciona listener para o formulário de edição no modal
-            document.getElementById('editProcessForm').addEventListener('submit', function(e) {
-                // Usa o novo ID do formulário e o ID do processo
-                window.handleProcessSubmit(e, processId);
-                window.closeModal();
-            });
-        };
-
-        window.openManageColaboradoresModal = function() {
-            let listHtml = window.colaboradoresList.sort().map(colab => `
-                <li class="flex justify-between items-center py-2 border-b last:border-b-0">
-                    <span>${colab}</span>
-                    <button onclick="window.removeColaborador('${colab}')" class="text-red-500 hover:text-red-700 text-sm">Excluir</button>
-                </li>
-            `).join('');
-
-            const content = `
-                <h3 class="text-xl font-bold mb-4">Gerenciar Colaboradores</h3>
-                
-                <!-- Adicionado form para submissão via Enter/botão -->
-                <form id="addColaboradorForm" class="mb-4">
-                    <label for="newColaboradorName" class="block text-sm font-medium text-gray-700 mb-1">Novo Colaborador</label>
-                    <div class="flex space-x-2">
-                        <input type="text" id="newColaboradorName" name="newColaboradorName" placeholder="Nome do Colaborador" class="flex-grow border-gray-300 rounded-lg shadow-sm p-2" required>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition">Adicionar</button>
-                    </div>
-                </form>
-
-                <ul class="max-h-60 overflow-y-auto border rounded-lg p-2" id="colaboradoresListContainer">
-                    ${listHtml || '<li class="text-gray-500 py-2">Nenhum colaborador registrado.</li>'}
-                </ul>
-
-                <div class="mt-6 text-right">
-                    <button onclick="window.closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Fechar</button>
-                </div>
-            `;
-            window.showModal(content);
-            
-            // Adiciona o listener de submissão do formulário no modal
-            document.getElementById('addColaboradorForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const input = document.getElementById('newColaboradorName');
-                window.addColaborador(input.value);
-            });
-            
-            // Foca no input para facilitar a adição
-            document.getElementById('newColaboradorName').focus();
-        };
-        
-        // --- Lógica de Acesso Restrito (Função Atualizada) ---
-        
-        /**
-         * Solicita Login e Senha de administrador antes de abrir o relatório e valida contra as credenciais das Dras.
-         */
-        window.promptForAdminAccess = function() {
-            const content = `
-                <div class="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg" role="alert">
-                    <h4 class="font-bold text-lg text-yellow-800 mb-4 flex items-center">
-                        <span class="mr-2">🔒</span> Acesso ao Relatório
-                    </h4>
-                    <p class="text-yellow-800 mb-4">Insira o Login e a Senha para acessar o Relatório.</p>
+        Swal.fire({
+            title: `Editar Processo: ${processo.titulo}`,
+            html: `
+                <div class="text-left mt-4 space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">Colaborador <span class="text-red-500">*</span></label>
+                    <select id="swal-colaborador" class="w-full border p-2 rounded">${colaboradores.map(c => `<option value="${c}" ${processo.colaborador === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
                     
-                    <form id="adminAccessForm" class="space-y-3">
-                        <div>
-                            <label for="adminLoginInput" class="block text-sm font-medium text-gray-700 mb-1">Login (Ex: Dra. Cássia)</label>
-                            <input type="text" id="adminLoginInput" placeholder="Login" class="w-full border-gray-300 rounded-lg shadow-sm p-2" required autofocus>
-                        </div>
-                        
-                        <div>
-                            <label for="adminPasswordInput" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                            <input type="password" id="adminPasswordInput" placeholder="Senha" class="w-full border-gray-300 rounded-lg shadow-sm p-2" required>
-                        </div>
+                    <label class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
+                    <select id="swal-status" class="w-full border p-2 rounded">
+                        ${['Em Tratamento', 'Tratados na Semana', 'Próximos Processos', 'Histórico de Concluídos'].map(s => `<option value="${s}" ${processo.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>
 
-                        <div class="flex justify-end space-x-3 pt-4">
-                            <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
-                            <button type="submit" class="px-4 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-indigo-700 transition">Acessar Relatório</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            window.showModal(content);
-            
-            // Adiciona listener para a submissão do formulário
-            document.getElementById('adminAccessForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const inputLogin = document.getElementById('adminLoginInput').value.trim();
-                const inputPassword = document.getElementById('adminPasswordInput').value;
-                
-                // 1. Verifica se as credenciais correspondem a alguma Dra.
-                const isAuthenticated = ADMIN_CREDENTIALS.some(cred => 
-                    cred.login === inputLogin && cred.senha === inputPassword
-                );
-
-                if (isAuthenticated) {
-                    window.closeModal();
-                    window.openReportDashboardModal(); // Chama a função restrita
-                } else {
-                    document.getElementById('adminPasswordInput').value = ''; // Limpa a senha
-                    document.getElementById('adminLoginInput').focus();
-                    window.showModalMessage('Login ou Senha incorretos. Acesso negado.', 'error');
-                }
-            });
-
-            // Foca no input para iniciar a digitação
-            document.getElementById('adminLoginInput').focus();
-        };
-
-        // --- Lógica do Relatório (Acesso Direto) ---
-
-        /**
-         * Abre o modal do Dashboard de Relatório Semanal.
-         * Esta função só é chamada APÓS a autenticação simulada.
-         */
-        window.openReportDashboardModal = function() {
-            const allProcesses = window.processes;
-
-            // 1. Cálculos de Métricas
-            const totalRegistered = allProcesses.length;
-            const currentlyInTreatment = allProcesses.filter(p => p.status === 'Em Tratamento').length;
-            const nextInQueue = allProcesses.filter(p => p.status === 'Próximos Processos').length;
-            
-            const concludedThisWeekProcesses = allProcesses
-                .filter(p => p.dataConclusao && window.isWithinLast7Days(p.dataConclusao))
-                .sort((a, b) => new Date(b.dataConclusao) - new Date(a.dataConclusao));
-
-            // 2. Geração da Tabela de Concluídos
-            const detailsTableHtml = concludedThisWeekProcesses.length > 0 ? 
-                concludedThisWeekProcesses.map(p => `
-                    <tr class="border-b hover:bg-gray-50 text-sm">
-                        <td class="p-2 font-medium truncate max-w-xs">${p.titulo}</td>
-                        <td class="p-2 text-center text-gray-600">${p.colaborador}</td>
-                        <td class="p-2 text-center text-xs">${p.dataRegistro ? window.formatDate(p.dataRegistro) : '-'}</td>
-                        <td class="p-2 text-center font-semibold text-green-600">${window.formatDate(p.dataConclusao)}</td>
-                    </tr>
-                `).join('')
-                :
-                `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nenhum processo concluído nos últimos 7 dias.</td></tr>`;
-
-            // 3. Geração do HTML do Modal
-            const dashboardHtml = `
-                <div class="relative p-6 overflow-y-auto max-h-[90vh]">
-                    <h2 class="text-2xl md:text-3xl font-extrabold mb-6">Relatório Semanal de Processos</h2>
-
-                    <h3 class="text-lg font-bold mb-4 text-gray-700">Resumo de Performance (Visão Geral)</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        
-                        <!-- Card: Total Registrado -->
-                        <div class="bg-gray-100 p-4 rounded-xl shadow-lg border-t-4 border-gray-400">
-                            <div class="text-3xl font-extrabold text-gray-800">${totalRegistered}</div>
-                            <div class="text-sm text-gray-600 mt-1">Total de Processos Registrados</div>
-                        </div>
-
-                        <!-- Card: Concluídos Esta Semana (Meta) -->
-                        <div class="bg-green-meta p-4 rounded-xl shadow-lg border-t-4 border-green-500">
-                            <div class="text-3xl font-extrabold text-green-700">${concludedThisWeekProcesses.length}</div>
-                            <div class="text-sm text-green-700 mt-1">Concluídos Esta Semana (7 dias)</div>
-                        </div>
-
-                        <!-- Card: Atualmente em Tratamento -->
-                        <div class="bg-orange-meta p-4 rounded-xl shadow-lg border-t-4 border-orange-500">
-                            <div class="text-3xl font-extrabold text-orange-700">${currentlyInTreatment}</div>
-                            <div class="text-sm text-orange-700 mt-1">Atualmente em Tratamento</div>
-                        </div>
-
-                        <!-- Card: Próximos na Fila -->
-                        <div class="bg-blue-meta p-4 rounded-xl shadow-lg border-t-4 border-indigo-500">
-                            <div class="text-3xl font-extrabold text-indigo-700">${nextInQueue}</div>
-                            <div class="text-sm text-indigo-700 mt-1">Próximos Processos (Na Fila)</div>
-                        </div>
-                    </div>
-
-                    <h3 class="text-lg font-bold mb-3 text-gray-700">Detalhes: Processos Concluídos na Semana</h3>
-                    <div class="bg-white border rounded-xl overflow-hidden shadow-inner mb-6">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="p-2 text-left text-xs font-medium text-gray-500 uppercase">PROCESSO</th>
-                                    <th class="p-2 text-center text-xs font-medium text-gray-500 uppercase">COLABORADOR</th>
-                                    <th class="p-2 text-center text-xs font-medium text-gray-500 uppercase">REG.</th>
-                                    <th class="p-2 text-center text-xs font-medium text-gray-500 uppercase">CONCLUÍDO EM</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                ${detailsTableHtml}
-                            </tbody>
-                        </table>
-                    </div>
+                    <label class="block text-sm font-medium text-gray-700">Título <span class="text-red-500">*</span></label>
+                    <input id="swal-titulo" type="text" class="w-full border p-2 rounded" value="${processo.titulo}">
                     
-                    <!-- Botões de Ação -->
-                    <div class="space-y-4 pt-4">
-                        <button onclick="window.exportToExcelData()" class="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg shadow-lg hover:bg-green-700 transition duration-150">
-                            Baixar Relatório Completo (CSV/Excel)
-                        </button>
-                        <button onclick="window.closeModal()" class="w-full px-4 py-3 bg-red-500 text-white font-bold rounded-lg shadow-lg hover:bg-red-600 transition duration-150">
-                            Fechar Relatório
-                        </button>
-                    </div>
+                    <label class="block text-sm font-medium text-gray-700">Previsão (YYYY-MM-DD - Opcional)</label>
+                    <input id="swal-data-previsao" type="date" class="w-full border p-2 rounded" value="${processo.dataPrevisao || ''}">
+
+                    <label class="block text-sm font-medium text-gray-700">Conclusão (YYYY-MM-DD - Opcional)</label>
+                    <input id="swal-data-conclusao" type="date" class="w-full border p-2 rounded" value="${processo.dataConclusao || ''}">
+
+                    <label class="block text-sm font-medium text-gray-700">Observações</label>
+                    <textarea id="swal-observacoes" class="w-full border p-2 rounded">${processo.observacoes}</textarea>
                 </div>
-            `;
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Salvar Alterações',
+            preConfirm: () => {
+                const titulo = document.getElementById('swal-titulo').value;
+                const colaborador = document.getElementById('swal-colaborador').value;
+                const status = document.getElementById('swal-status').value;
+                const dataPrevisao = document.getElementById('swal-data-previsao').value;
+                const dataConclusao = document.getElementById('swal-data-conclusao').value;
+                const observacoes = document.getElementById('swal-observacoes').value;
 
-            // Abre o modal com largura maior (max-w-4xl)
-            window.showModal(dashboardHtml, true);
-        };
-
-
-        /**
-         * Exporta os dados completos para CSV.
-         */
-        window.exportToExcelData = function() {
-            const header = [
-                "ID", "Colaborador", "Status", "Data de Registro", "Data de Previsão",
-                "Data de Conclusão", "Título do Processo/Tarefa", "Observações"
-            ];
-
-            const csvRows = window.processes.map(p => {
-                const escape = (str) => {
-                    if (str === null || str === undefined) return "";
-                    let s = String(str).replace(/"/g, '""');
-                    return `"${s}"`;
+                if (!titulo || !colaborador || !status) {
+                    Swal.showValidationMessage('Os campos obrigatórios (marcados com *) devem ser preenchidos.');
+                    return false;
+                }
+                return { 
+                    titulo, 
+                    colaborador, 
+                    status, 
+                    dataPrevisao: dataPrevisao || null, 
+                    dataConclusao: dataConclusao || null,
+                    observacoes 
                 };
-
-                return [
-                    escape(p.id),
-                    escape(p.colaborador),
-                    escape(p.status),
-                    escape(p.dataRegistro ? window.formatDate(p.dataRegistro) : ""),
-                    escape(p.dataPrevisao ? window.formatDate(p.dataPrevisao) : ""),
-                    escape(p.dataConclusao ? window.formatDate(p.dataConclusao) : ""),
-                    escape(p.titulo),
-                    escape(p.observacoes)
-                ].join(';');
-            });
-
-            const csvString = [
-                header.join(';'),
-                ...csvRows
-            ].join('\n');
-
-            const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            
-            const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-            link.download = `relatorio_processos_${today}.csv`;
-            
-            link.href = URL.createObjectURL(blob);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Fecha o modal do dashboard após a exportação, se estiver aberto
-            window.closeModal(); 
-            window.showModalMessage('Relatório Excel (CSV) gerado com sucesso!', 'info');
-        };
-
-        // --- Inicialização Local ---
-
-        function loadInitialDataAndRender() {
-            window.updateStatus('Carregando dados locais...', true);
-
-            // Carrega processos (ou lista vazia se for a primeira vez)
-            window.processes = loadData(LS_PROCESSES_KEY, []);
-
-            // Carrega colaboradores (ou lista inicial se for a primeira vez)
-            let loadedColaboradores = loadData(LS_COLABORADORES_KEY, null);
-            
-            if (!loadedColaboradores || loadedColaboradores.length === 0) {
-                loadedColaboradores = window.COLABORADORES_INICIAIS;
-                saveData(LS_COLABORADORES_KEY, loadedColaboradores);
             }
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                if (!isAuthReady) {
+                    Swal.fire('Erro', 'Aguarde a conexão com o banco de dados.', 'error');
+                    return;
+                }
+                
+                try {
+                    const data = result.value;
+                    // Usa updateDoc para atualizar o documento no Firestore
+                    await updateDoc(doc(db, getProcessosCollectionPath(), id), {
+                        titulo: data.titulo,
+                        colaborador: data.colaborador,
+                        status: data.status,
+                        dataPrevisao: data.dataPrevisao,
+                        dataConclusao: data.dataConclusao,
+                        observacoes: data.observacoes,
+                        updatedAt: new Date().toISOString() // Adiciona data de atualização
+                    });
 
-            window.colaboradoresList = loadedColaboradores;
+                    Swal.fire('Salvo!', 'O processo foi atualizado e sincronizado.', 'success');
+                    // O onSnapshot cuidará da atualização na UI
+                } catch (error) {
+                    console.error("Erro ao atualizar processo no Firestore:", error);
+                    Swal.fire('Erro de Gravação', 'Não foi possível atualizar o processo. Verifique as permissões.', 'error');
+                }
+            }
+        });
+    }
 
-            window.fillColaboradorSelects();
-            window.renderKanban();
-            window.updateStatus('Pronto!', false);
-        }
+    // --- Gerenciamento de Colaboradores (Local) ---
+
+    // [As funções de gerenciamento de colaboradores (abrirModalColaboradores, renderizarListaColaboradoresModal, adicionarColaborador, excluirColaborador) permanecem USANDO LOCALSTORAGE para simplificar, pois não são dados essenciais de colaboração em tempo real.]
+
+    function abrirModalColaboradores() {
+        Swal.fire({
+            title: 'Gerenciar Colaboradores',
+            html: `
+                <div class="mt-4">
+                    <input id="novo-colaborador-nome" class="w-full border p-2 rounded mb-3" placeholder="Novo nome do colaborador">
+                    <button id="btn-adicionar-colaborador" class="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition mb-4">Adicionar Colaborador</button>
+                    <div id="lista-colaboradores" class="max-h-60 overflow-y-auto border p-2 rounded text-left space-y-1">
+                        <!-- Lista de colaboradores aqui -->
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            showCloseButton: true,
+            didOpen: () => {
+                renderizarListaColaboradoresModal();
+                document.getElementById('btn-adicionar-colaborador').onclick = adicionarColaborador;
+            }
+        });
+    }
+
+    function renderizarListaColaboradoresModal() {
+        const listaDiv = document.getElementById('lista-colaboradores');
+        listaDiv.innerHTML = '';
         
-        function setupEventListeners() {
-            const mainForm = document.getElementById('newProcessForm');
-            if (mainForm) {
-                // Atualiza o listener para usar a nova cor principal
-                mainForm.addEventListener('submit', (e) => window.handleProcessSubmit(e, null));
-            }
+        colaboradores.sort().forEach(nome => {
+            const item = document.createElement('div');
+            item.className = 'flex justify-between items-center p-1 border-b last:border-b-0';
+            item.innerHTML = `
+                <span>${nome}</span>
+                <button onclick="window.excluirColaboradorLocal('${nome}')" class="text-red-500 hover:text-red-700 transition">
+                    <i class="fas fa-times-circle"></i> Excluir
+                </button>
+            `;
+            listaDiv.appendChild(item);
+        });
+    }
 
-            document.getElementById('filterColaborador')?.addEventListener('change', window.applyFilters);
-            document.getElementById('filterDataRegistroInicio')?.addEventListener('change', window.applyFilters);
-            document.getElementById('filterDataConclusaoFim')?.addEventListener('change', window.applyFilters);
-            document.getElementById('limparFiltrosBtn')?.addEventListener('click', () => {
-                document.getElementById('filterColaborador').value = 'todos';
-                document.getElementById('filterDataRegistroInicio').value = '';
-                document.getElementById('filterDataConclusaoFim').value = '';
-                window.applyFilters();
+    function adicionarColaborador() {
+        const nomeInput = document.getElementById('novo-colaborador-nome');
+        const nome = nomeInput.value.trim();
+
+        if (nome && !colaboradores.includes(nome)) {
+            colaboradores.push(nome);
+            salvarColaboradores();
+            renderizarListaColaboradoresModal();
+            nomeInput.value = '';
+            Swal.fire('Adicionado!', `${nome} foi adicionado à lista.`, 'success');
+        } else if (colaboradores.includes(nome)) {
+            Swal.fire('Atenção', `${nome} já existe na lista.`, 'warning');
+        }
+    }
+
+    window.excluirColaboradorLocal = function(nome) {
+         Swal.fire({
+            title: `Excluir ${nome}?`,
+            text: "Os processos deste colaborador permanecerão, mas o nome será removido das opções futuras.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sim, remover!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                colaboradores = colaboradores.filter(c => c !== nome);
+                salvarColaboradores();
+                renderizarListaColaboradoresModal();
+                Swal.fire('Removido!', `${nome} foi removido.`, 'success');
+            }
+        });
+    }
+
+    
+    // --- Funções de Filtro ---
+
+    function aplicarFiltros(data = processos) {
+        const colabFiltro = filtroColaboradorSelect.value;
+        const regFiltro = filtroDataRegistro.value;
+        const concFiltro = filtroDataConclusao.value;
+
+        let processosFiltrados = data;
+
+        // Filtro por Colaborador
+        if (colabFiltro) {
+            processosFiltrados = processosFiltrados.filter(p => p.colaborador === colabFiltro);
+        }
+
+        // Filtro por Data de Registro
+        if (regFiltro) {
+            processosFiltrados = processosFiltrados.filter(p => p.dataRegistro === regFiltro);
+        }
+
+        // Filtro por Data de Conclusão
+        if (concFiltro) {
+            processosFiltrados = processosFiltrados.filter(p => p.dataConclusao === concFiltro);
+        }
+
+        renderizarKanban(processosFiltrados);
+        return processosFiltrados;
+    }
+
+    function limparFiltros() {
+        filtroColaboradorSelect.value = '';
+        filtroDataRegistro.value = '';
+        filtroDataConclusao.value = '';
+        renderizarKanban(processos);
+    }
+
+    // --- FUNÇÃO DE EXPORTAÇÃO E LOGIN RESTRITO ---
+
+    /**
+     * Função principal acionada pelo botão "Extrair Relatório Completo".
+     * Esta função solicita o login seguro e, se bem-sucedido, realiza o download do Excel.
+     */
+    function exportarParaExcel() {
+        // [Lógica de SVG de Segurança Omitida para brevidade]
+        const svgSeguranca = encodeURIComponent(`<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect width="200" height="100" fill="#f0f0f0" rx="10"/><circle cx="50" cy="50" r="20" fill="#3b82f6"/><rect x="90" y="35" width="90" height="10" fill="#1f2937"/><rect x="90" y="55" width="70" height="10" fill="#1f2937"/><text x="100" y="85" font-size="12" fill="#ef4444" text-anchor="middle">Acesso Seguro - Dras. C e J</text></svg>`);
+        const imageUrl = 'data:image/svg+xml;utf8,' + svgSeguranca;
+
+        Swal.fire({
+            title: 'Acesso Restrito - Exportação',
+            html: `
+                <div class="p-4 bg-gray-100 rounded-lg">
+                    <img src="${imageUrl}" alt="Imagem de Segurança" class="mx-auto my-4 border border-gray-300 rounded-lg shadow-md max-w-full">
+                    <p class="text-sm text-gray-600 mb-4">A exportação do relatório completo requer Login Seguro.</p>
+                    <input id="swal-login" type="text" class="w-full border p-3 rounded mb-2" placeholder="Login (Ex: Dra. Cássia)">
+                    <input id="swal-senha" type="password" class="w-full border p-3 rounded" placeholder="Senha">
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar Login e Exportar',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                const login = document.getElementById('swal-login').value.trim();
+                const senha = document.getElementById('swal-senha').value.trim();
+                if (!login || !senha) {
+                    Swal.showValidationMessage('Por favor, preencha Login e Senha.');
+                    return false;
+                }
+                if (USUARIOS_AUTORIZADOS[login] === senha) {
+                    return true;
+                } else {
+                    Swal.showValidationMessage('Login ou Senha incorretos. Acesso negado.');
+                    return false;
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (processos.length === 0) {
+                    Swal.fire('Atenção', 'Não há processos registrados para exportar.', 'warning');
+                    return;
+                }
+                
+                // Mapeia os dados do Firestore para o formato de planilha
+                const dadosPlanilha = processos.map(p => ({
+                    ID: p.id,
+                    'Colaborador Responsável': p.colaborador,
+                    Status: p.status,
+                    'Data de Registro': p.dataRegistro,
+                    'Data de Previsão': p.dataPrevisao || 'N/A',
+                    'Data de Conclusão': p.dataConclusao || 'Pendente',
+                    'Título do Processo/Tarefa': p.titulo,
+                    Observações: p.observacoes
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(dadosPlanilha);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'RelatorioProcessos');
+
+                const hoje = new Date().toISOString().slice(0, 10);
+                XLSX.writeFile(workbook, `Relatorio_Processos_${hoje}.xlsx`);
+                
+                Swal.fire('Sucesso!', 'Relatório exportado com sucesso.', 'success');
+            }
+        });
+    }
+
+    // --- Funções de Drag and Drop (Kanban - FIREBASE) ---
+
+    let draggedItem = null;
+
+    function adicionarListenersDragAndDrop() {
+        document.querySelectorAll('.kanban-card').forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                draggedItem = e.target;
+                e.target.classList.add('opacity-50');
             });
 
-            // O botão de Relatório chama a função de acesso restrito (promptForAdminAccess)
-            document.getElementById('extrairRelatorioBtn')?.addEventListener('click', window.promptForAdminAccess);
-            document.getElementById('manageColaboradoresBtn')?.addEventListener('click', window.openManageColaboradoresModal);
+            card.addEventListener('dragend', (e) => {
+                e.target.classList.remove('opacity-50');
+                draggedItem = null;
+            });
+        });
 
-            window.modalContainer.addEventListener('click', (e) => {
-                // Se clicar no container, fecha o modal, exceto se for o relatório (que tem um close manual)
-                if (e.target === window.modalContainer) {
-                    const isReportModal = window.modalContent.querySelector('.relative.p-6');
-                    const isAdminPrompt = window.modalContent.querySelector('#adminAccessForm');
-                    // Não fecha se for o prompt de senha ou o modal de relatório
-                    if (!isReportModal && !isAdminPrompt) {
-                         window.closeModal();
+        document.querySelectorAll('.kanban-cards-container').forEach(container => {
+            container.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Permite o drop
+            });
+
+            container.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                if (draggedItem && isAuthReady) {
+                    const novoStatus = container.getAttribute('data-status');
+                    const processoId = draggedItem.getAttribute('data-id');
+                    
+                    const processo = processos.find(p => p.id === processoId);
+                    if (processo && processo.status !== novoStatus) {
+                        
+                        let dataConclusaoAtualizada = processo.dataConclusao;
+
+                        // Lógica de atualização de Data de Conclusão
+                        if (novoStatus === 'Histórico de Concluídos' && !processo.dataConclusao) {
+                            dataConclusaoAtualizada = new Date().toISOString().slice(0, 10);
+                        } else if (novoStatus !== 'Histórico de Concluídos') {
+                            dataConclusaoAtualizada = null;
+                        }
+                        
+                        try {
+                            // Atualiza o status e a data de conclusão no Firestore
+                            await updateDoc(doc(db, getProcessosCollectionPath(), processoId), {
+                                status: novoStatus,
+                                dataConclusao: dataConclusaoAtualizada,
+                                updatedAt: new Date().toISOString()
+                            });
+                            // O onSnapshot vai mover o card na UI, então não precisamos mexer no DOM aqui.
+                        } catch (error) {
+                            console.error("Erro ao atualizar status do processo no Firestore:", error);
+                            Swal.fire('Erro', 'Não foi possível atualizar o status no banco de dados.', 'error');
+                        }
                     }
                 }
             });
-            
-            // Define a data de registro padrão como hoje
-            document.getElementById('inputDataRegistro').valueAsDate = new Date();
-        }
+        });
+    }
 
-        // Inicia o aplicativo ao carregar a página
-        window.onload = function() {
-            setupEventListeners();
-            loadInitialDataAndRender();
+    // --- Inicialização e Event Listeners ---
+
+    window.onload = function() {
+        inicializarFirebase(); // Inicia a conexão com o Firebase e a escuta em tempo real
+        carregarColaboradores(); // Mantém o carregamento de colaboradores local
+        renderizarSelects();
+        
+        // Define a data de registro para hoje por padrão
+        document.getElementById('data-registro').valueAsDate = new Date();
+    };
+
+    // Listeners de Eventos
+    formNovoProcesso.addEventListener('submit', adicionarNovoProcesso);
+    btnExportarExcel.addEventListener('click', exportarParaExcel); 
+    btnLimparFiltros.addEventListener('click', limparFiltros);
+    // Os filtros agora chamam a função que aplica os filtros no array 'processos'
+    filtroColaboradorSelect.addEventListener('change', () => aplicarFiltros());
+    filtroDataRegistro.addEventListener('change', () => aplicarFiltros());
+    filtroDataConclusao.addEventListener('change', () => aplicarFiltros());
+    
+    // Listener para o campo Colaborador (para abrir o modal de gerenciamento)
+    colaboradorSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'gerenciar-colaboradores') {
+            abrirModalColaboradores();
+            e.target.value = ''; 
         }
-    </script>
+    });
+
+    // Torna as funções de CRUD globais para que os botões dentro do card (criado dinamicamente) possam acessá-las
+    window.editarProcesso = editarProcesso; 
+    window.excluirProcesso = excluirProcesso;
+</script>
+
 </body>
 </html>
