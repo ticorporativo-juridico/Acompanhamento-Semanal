@@ -213,8 +213,9 @@
 
                 <!-- Botão de Inclusão -->
                 <div class="col-span-full pt-4">
-                    <button type="submit" id="btn-incluir-processo" class="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 transition">
-                        <i class="fas fa-plus-circle"></i> Incluir Processo
+                    <!-- CORREÇÃO: Botão inicia desativado e com estado de loading -->
+                    <button type="submit" id="btn-incluir-processo" class="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-gray-400 cursor-not-allowed transition" disabled>
+                        <i class="fas fa-spinner fa-spin"></i> Conectando ao Banco de Dados...
                     </button>
                 </div>
             </form>
@@ -268,9 +269,26 @@
     const filtroDataRegistro = document.getElementById('filtro-data-registro');
     const filtroDataConclusao = document.getElementById('filtro-data-conclusao');
     const loadingIndicator = document.getElementById('loading-indicator');
+    const btnIncluirProcesso = document.getElementById('btn-incluir-processo'); // Novo elemento
 
 
     // --- Funções de Inicialização e Autenticação (FIREBASE) ---
+
+    // Nova função auxiliar para controlar o estado do botão de inclusão
+    function updateSubmitButton(ready) {
+        if (ready) {
+            btnIncluirProcesso.disabled = false;
+            btnIncluirProcesso.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            btnIncluirProcesso.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            btnIncluirProcesso.innerHTML = '<i class="fas fa-plus-circle"></i> Incluir Processo';
+        } else {
+            btnIncluirProcesso.disabled = true;
+            btnIncluirProcesso.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            btnIncluirProcesso.classList.add('bg-gray-400', 'cursor-not-allowed');
+            btnIncluirProcesso.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando ao Banco de Dados...';
+        }
+    }
+
 
     async function inicializarFirebase() {
         if (Object.keys(firebaseConfig).length === 0) {
@@ -298,6 +316,7 @@
                     userId = user.uid;
                     isAuthReady = true;
                     document.getElementById('auth-status').textContent = `Usuário ID: ${userId}`;
+                    updateSubmitButton(true); // Ativa o botão após a autenticação
                     
                     // Inicia a escuta dos dados após a autenticação
                     ouvirProcessos(); 
@@ -305,12 +324,14 @@
                     userId = null;
                     isAuthReady = false;
                     document.getElementById('auth-status').textContent = 'Usuário: Desconectado';
+                    updateSubmitButton(false); // Mantém o botão desativado em caso de erro/desconexão
                 }
             });
 
         } catch (error) {
             console.error("Erro na inicialização ou autenticação do Firebase:", error);
             document.getElementById('auth-status').textContent = 'Erro de Conexão com Firebase';
+            updateSubmitButton(false); // Mantém o botão desativado em caso de erro
         }
     }
 
@@ -861,6 +882,7 @@
     // --- Inicialização e Event Listeners ---
 
     window.onload = function() {
+        updateSubmitButton(false); // Inicia o botão no estado "Conectando..."
         inicializarFirebase(); // Inicia a conexão com o Firebase e a escuta em tempo real
         carregarColaboradores(); // Mantém o carregamento de colaboradores local
         renderizarSelects();
