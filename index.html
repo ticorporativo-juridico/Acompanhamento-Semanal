@@ -81,7 +81,7 @@
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            100% { transform(360deg); }
         }
     </style>
 </head>
@@ -233,6 +233,12 @@
         // Chaves do LocalStorage
         const LS_PROCESSES_KEY = 'kanbanProcesses';
         const LS_COLABORADORES_KEY = 'kanbanColaboradores';
+        
+        // Credenciais de Acesso Administrador (Simuladas)
+        const ADMIN_CREDENTIALS = [
+            { login: 'Dra. Cássia', senha: '1234$C' },
+            { login: 'Dra. Janaína', senha: '5678$J' }
+        ];
 
         window.COLABORADORES_INICIAIS = [
             'Beatriz', 'Diego', 'Emily', 'Felipe', 'João', 'Jessica', 'José', 'Giovana', 'Mariane', 'Rebeca', 'Tairane', 'Thais'
@@ -815,10 +821,70 @@
             document.getElementById('newColaboradorName').focus();
         };
         
+        // --- Lógica de Acesso Restrito (Função Atualizada) ---
+        
+        /**
+         * Solicita Login e Senha de administrador antes de abrir o relatório e valida contra as credenciais das Dras.
+         */
+        window.promptForAdminAccess = function() {
+            const content = `
+                <div class="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg" role="alert">
+                    <h4 class="font-bold text-lg text-yellow-800 mb-4 flex items-center">
+                        <span class="mr-2">🔒</span> Acesso ao Relatório
+                    </h4>
+                    <p class="text-yellow-800 mb-4">Insira o Login e a Senha para acessar o Relatório.</p>
+                    
+                    <form id="adminAccessForm" class="space-y-3">
+                        <div>
+                            <label for="adminLoginInput" class="block text-sm font-medium text-gray-700 mb-1">Login (Ex: Dra. Cássia)</label>
+                            <input type="text" id="adminLoginInput" placeholder="Login" class="w-full border-gray-300 rounded-lg shadow-sm p-2" required autofocus>
+                        </div>
+                        
+                        <div>
+                            <label for="adminPasswordInput" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                            <input type="password" id="adminPasswordInput" placeholder="Senha" class="w-full border-gray-300 rounded-lg shadow-sm p-2" required>
+                        </div>
+
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
+                            <button type="submit" class="px-4 py-2 bg-primary-accent text-white font-semibold rounded-lg hover:bg-indigo-700 transition">Acessar Relatório</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            window.showModal(content);
+            
+            // Adiciona listener para a submissão do formulário
+            document.getElementById('adminAccessForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const inputLogin = document.getElementById('adminLoginInput').value.trim();
+                const inputPassword = document.getElementById('adminPasswordInput').value;
+                
+                // 1. Verifica se as credenciais correspondem a alguma Dra.
+                const isAuthenticated = ADMIN_CREDENTIALS.some(cred => 
+                    cred.login === inputLogin && cred.senha === inputPassword
+                );
+
+                if (isAuthenticated) {
+                    window.closeModal();
+                    window.openReportDashboardModal(); // Chama a função restrita
+                } else {
+                    document.getElementById('adminPasswordInput').value = ''; // Limpa a senha
+                    document.getElementById('adminLoginInput').focus();
+                    window.showModalMessage('Login ou Senha incorretos. Acesso negado.', 'error');
+                }
+            });
+
+            // Foca no input para iniciar a digitação
+            document.getElementById('adminLoginInput').focus();
+        };
+
         // --- Lógica do Relatório (Acesso Direto) ---
 
         /**
          * Abre o modal do Dashboard de Relatório Semanal.
+         * Esta função só é chamada APÓS a autenticação simulada.
          */
         window.openReportDashboardModal = function() {
             const allProcesses = window.processes;
@@ -1001,15 +1067,17 @@
                 window.applyFilters();
             });
 
-            // Botão de Relatório agora chama diretamente o dashboard (sem login)
-            document.getElementById('extrairRelatorioBtn')?.addEventListener('click', window.openReportDashboardModal);
+            // O botão de Relatório chama a função de acesso restrito (promptForAdminAccess)
+            document.getElementById('extrairRelatorioBtn')?.addEventListener('click', window.promptForAdminAccess);
             document.getElementById('manageColaboradoresBtn')?.addEventListener('click', window.openManageColaboradoresModal);
 
             window.modalContainer.addEventListener('click', (e) => {
                 // Se clicar no container, fecha o modal, exceto se for o relatório (que tem um close manual)
                 if (e.target === window.modalContainer) {
                     const isReportModal = window.modalContent.querySelector('.relative.p-6');
-                    if (!isReportModal) {
+                    const isAdminPrompt = window.modalContent.querySelector('#adminAccessForm');
+                    // Não fecha se for o prompt de senha ou o modal de relatório
+                    if (!isReportModal && !isAdminPrompt) {
                          window.closeModal();
                     }
                 }
