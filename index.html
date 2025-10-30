@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Acompanhamento Semanal (Firebase)</title>
+    <title>Dashboard de Acompanhamento Semanal (Local)</title>
     
     <!-- Carregamento do Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -69,7 +69,7 @@
         .icon-edit::after { content: '✏️'; font-size: 1rem; opacity: 0.6; cursor: pointer; }
         .icon-delete::after { content: '🗑️'; font-size: 1rem; opacity: 0.6; cursor: pointer; margin-left: 0.5rem; }
         
-        /* Estilo para loading */
+        /* Estilo para loading/status */
         .loading-spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #5b21b6;
@@ -87,7 +87,7 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Modal para Login e Mensagens -->
+    <!-- Modal para Mensagens -->
     <div id="modal-container" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden justify-center items-center">
         <div id="modal-content" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md transform transition-all">
             <!-- Conteúdo do modal será injetado pelo JavaScript -->
@@ -97,15 +97,13 @@
     <!-- Indicador de Status/Loading -->
     <div id="status-indicator" class="fixed top-4 right-4 z-40 p-3 bg-indigo-100 text-indigo-800 rounded-lg shadow-md flex items-center hidden">
         <div class="loading-spinner mr-3"></div>
-        <span id="status-message">Conectando...</span>
+        <span id="status-message">Carregando dados locais...</span>
     </div>
 
     <!-- 1. HEADER -->
     <header class="header-bg p-8 text-white rounded-xl shadow-lg mb-8">
         <h1 class="text-3xl md:text-4xl font-extrabold text-center">Dashboard de Acompanhamento Semanal</h1>
-        <p class="text-center text-gray-300 mt-2">Colaboração em tempo real via Firestore.</p>
-        <!-- Mostrar ID do Usuário para colaboração -->
-        <p id="user-id-display" class="text-center text-xs text-gray-400 mt-2">ID do Usuário: Carregando...</p>
+        <p class="text-center text-gray-300 mt-2">Dados armazenados localmente no seu navegador (localStorage).</p>
     </header>
 
     <main class="space-y-10">
@@ -140,7 +138,7 @@
                     Limpar Filtros
                 </button>
 
-                <!-- Botão Extrair Relatório (Protegido por Login) -->
+                <!-- Botão Extrair Relatório (Acesso direto) -->
                 <button id="extrairRelatorioBtn" class="w-full md:w-auto px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 flex items-center justify-center">
                     Extrair Relatório ( 📊 )
                 </button>
@@ -228,28 +226,14 @@
         </section>
     </main>
 
-    <!-- Importações Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, setDoc, deleteDoc, onSnapshot, collection, query, updateDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // --- Variáveis Globais (Disponibilizadas pelo Canvas) ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // --- Variáveis Firebase ---
-        let db;
-        let auth;
-        let userId = 'loading'; // ID do usuário, será definido após a autenticação
-
+    <!-- Script de Lógica LocalStorage -->
+    <script>
         // --- Variáveis de Configuração e Estado ---
-        window.USUARIOS_RELATORIO = {
-            'Dra. Cássia': '1234$C',
-            'Dra. Janaína': '5678$J'
-        };
         
+        // Chaves do LocalStorage
+        const LS_PROCESSES_KEY = 'kanbanProcesses';
+        const LS_COLABORADORES_KEY = 'kanbanColaboradores';
+
         window.COLABORADORES_INICIAIS = [
             'Beatriz', 'Diego', 'Emily', 'Felipe', 'João', 'Jessica', 'José', 'Giovana', 'Mariane', 'Rebeca', 'Tairane', 'Thais'
         ];
@@ -261,17 +245,46 @@
             'Histórico de Concluídos'
         ];
         
-        // Dados sincronizados do Firestore
+        // Dados locais
         window.processes = [];
         window.colaboradoresList = [];
         
-        window.isAuthReady = false;
         window.flashInterval = null;
 
-        // --- Caminhos do Firestore (Todos Públicos para Colaboração) ---
-        const PROCESSES_PATH = `artifacts/${appId}/public/data/processes`;
-        const COLABORADORES_PATH = `artifacts/${appId}/public/data/colaboradores`;
-        const COLABORADORES_DOC_ID = 'list'; // Documento único para lista de colaboradores
+        // --- Funções de LocalStorage ---
+
+        /**
+         * Carrega dados do LocalStorage.
+         */
+        function loadData(key, defaultValue) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : defaultValue;
+            } catch (e) {
+                console.error(`Erro ao carregar dados da chave ${key}:`, e);
+                return defaultValue;
+            }
+        }
+
+        /**
+         * Salva dados no LocalStorage.
+         */
+        function saveData(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+                window.updateStatus('Dados salvos localmente', false);
+            } catch (e) {
+                console.error(`Erro ao salvar dados na chave ${key}:`, e);
+                window.updateStatus('Erro ao salvar dados locais', false);
+            }
+        }
+
+        /**
+         * Gera um ID simples (simulando ID de documento).
+         */
+        function generateUniqueId() {
+            return 'proc_' + Date.now() + Math.random().toString(36).substring(2, 9);
+        }
 
         // --- Funções de UI (Definidas globalmente para acesso nos listeners) ---
 
@@ -494,7 +507,6 @@
             }, {});
 
             filteredProcesses.forEach(p => {
-                // Garante que o processo seja um objeto e tenha um status válido
                 if (p && p.status && kanbanMap.hasOwnProperty(p.status)) {
                     kanbanMap[p.status].push(p);
                 }
@@ -528,8 +540,6 @@
             const colaborador = document.getElementById('filterColaborador')?.value;
             const dataInicioStr = document.getElementById('filterDataRegistroInicio')?.value;
             const dataFimStr = document.getElementById('filterDataConclusaoFim')?.value;
-            
-            if (!window.isAuthReady) return;
 
             const filtered = window.processes.filter(p => {
                 const colaboradorMatch = colaborador === 'todos' || p.colaborador === colaborador;
@@ -545,7 +555,8 @@
                     if (processDate) {
                         dataFimMatch = processDate <= dataFimStr;
                     } else {
-                        dataFimMatch = false;
+                        // Se o filtro Fim for setado e o processo não tiver data de Previsão nem Conclusão, não corresponde.
+                        dataFimMatch = false; 
                     }
                 }
 
@@ -588,22 +599,19 @@
                 if (select.querySelector(`option[value="${selectedValue}"]`)) {
                     select.value = selectedValue;
                 } else if (!isFilter) {
-                    select.value = ''; // Limpa se o valor selecionado foi removido
+                    // Seleciona o primeiro, se não for o filtro e nada foi selecionado antes
+                    select.value = list.length > 0 ? list.sort()[0] : '';
                 }
             });
         };
         
-        // --- Funções de CRUD (Firestore) ---
+        // --- Funções de CRUD (LocalStorage) ---
 
         /**
-         * Salva (Adiciona/Edita) um processo no Firestore.
+         * Salva (Adiciona/Edita) um processo no LocalStorage.
          */
         window.handleProcessSubmit = async function(event, processId = null) {
             event.preventDefault();
-            if (!window.isAuthReady) {
-                window.showModalMessage('Aguarde a conexão com o banco de dados.', 'error');
-                return;
-            }
             
             const form = event.target;
             
@@ -616,8 +624,6 @@
                 dataConclusao: form.querySelector('#inputDataConclusao').value || null,
                 titulo: form.querySelector('#inputTitulo').value,
                 observacoes: form.querySelector('#inputObservacoes').value,
-                // Metadados úteis
-                createdAt: processId ? form.dataset.createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             };
             
@@ -626,85 +632,80 @@
             try {
                 if (processId) {
                     // Edição
-                    await updateDoc(doc(db, PROCESSES_PATH, processId), processData);
-                    window.showModalMessage('Processo editado com sucesso!', 'success');
+                    const index = window.processes.findIndex(p => p.id === processId);
+                    if (index !== -1) {
+                        window.processes[index] = { ...window.processes[index], ...processData };
+                        window.showModalMessage('Processo editado com sucesso!', 'success');
+                    }
                 } else {
                     // Novo Processo
-                    await addDoc(collection(db, PROCESSES_PATH), processData);
+                    const newProcess = {
+                        id: generateUniqueId(),
+                        ...processData,
+                        createdAt: new Date().toISOString()
+                    };
+                    window.processes.push(newProcess);
                     form.reset();
                     // Garante que a data de registro volte para hoje após o reset
                     document.getElementById('inputDataRegistro').valueAsDate = new Date(); 
                     window.showModalMessage('Novo processo registrado com sucesso!', 'success');
                 }
+                
+                saveData(LS_PROCESSES_KEY, window.processes);
+                window.renderKanban();
+
             } catch (e) {
-                console.error("Erro ao salvar processo:", e);
+                console.error("Erro ao salvar processo localmente:", e);
                 window.showModalMessage(`Erro ao salvar: ${e.message}`, 'error');
             } finally {
-                window.updateStatus('Sincronizado', false);
+                window.updateStatus('Salvo localmente', false);
             }
         };
 
         /**
-         * Exclui um processo do Firestore.
+         * Exclui um processo do LocalStorage.
          */
         window.deleteProcess = function(processId) {
-            if (!window.isAuthReady) {
-                window.showModalMessage('Aguarde a conexão com o banco de dados.', 'error');
-                return;
-            }
-            window.showConfirmationModal('Tem certeza que deseja excluir este processo?', async () => {
+            window.showConfirmationModal('Tem certeza que deseja excluir este processo?', () => {
                 window.updateStatus('Excluindo processo...', true);
                 try {
-                    await deleteDoc(doc(db, PROCESSES_PATH, processId));
+                    window.processes = window.processes.filter(p => p.id !== processId);
+                    saveData(LS_PROCESSES_KEY, window.processes);
+                    window.renderKanban();
                     window.showModalMessage('Processo excluído com sucesso.', 'success');
                 } catch (e) {
                     console.error("Erro ao excluir processo:", e);
                     window.showModalMessage(`Erro ao excluir: ${e.message}`, 'error');
                 } finally {
-                    window.updateStatus('Sincronizado', false);
+                    window.updateStatus('Salvo localmente', false);
                 }
             });
         };
 
-        // --- Funções de Gerenciamento de Colaboradores (Firestore) ---
+        // --- Funções de Gerenciamento de Colaboradores (LocalStorage) ---
 
         /**
-         * Salva a lista atual de colaboradores no Firestore.
+         * Salva a lista atual de colaboradores no LocalStorage e atualiza selects.
          */
-        async function saveColaboradoresList() {
-             if (!window.isAuthReady) {
-                console.error("Auth não está pronto para salvar colaboradores.");
-                return;
-            }
-            window.updateStatus('Atualizando lista de colaboradores...', true);
-            try {
-                // Salva a lista no documento único
-                await setDoc(doc(db, COLABORADORES_PATH, COLABORADORES_DOC_ID), {
-                    list: window.colaboradoresList,
-                    updatedAt: new Date().toISOString()
-                });
-                window.updateStatus('Sincronizado', false);
-                window.fillColaboradorSelects();
-            } catch (e) {
-                console.error("Erro ao salvar colaboradores:", e);
-                window.showModalMessage('Erro ao salvar colaboradores.', 'error');
-                window.updateStatus('Erro de Sincronização', false);
-            }
+        function saveColaboradoresList() {
+            saveData(LS_COLABORADORES_KEY, window.colaboradoresList);
+            window.fillColaboradorSelects();
         }
         
         /**
          * Adiciona um novo colaborador.
          */
-        window.addColaborador = function() {
-            const input = document.getElementById('newColaboradorName');
-            const newName = input.value.trim();
+        window.addColaborador = function(newName) {
+            newName = newName.trim();
             if (newName && !window.colaboradoresList.includes(newName)) {
                 window.colaboradoresList.push(newName);
-                input.value = '';
                 saveColaboradoresList();
-                window.openManageColaboradoresModal(); // Recarrega o modal para atualizar
+                // Recarrega o modal para atualizar a lista visível e limpar o campo de entrada
+                window.openManageColaboradoresModal(); 
             } else if (window.colaboradoresList.includes(newName)) {
                 window.showModalMessage('Colaborador já existe!', 'error');
+            } else {
+                 window.showModalMessage('Nome do colaborador não pode estar vazio.', 'error');
             }
         };
 
@@ -716,18 +717,14 @@
             saveColaboradoresList();
             window.openManageColaboradoresModal(); // Recarrega o modal
             
-            // Remove o colaborador dos processos que ele está associado
-            window.processes.forEach(async (p) => {
+            // Atualiza os processos associados ao colaborador removido
+            window.processes.forEach(p => {
                 if (p.colaborador === nameToRemove) {
-                    // Nota: O updateDoc pode falhar se o processo for excluído por outro usuário,
-                    // mas é a melhor abordagem para tentar limpar a referência.
-                    try {
-                        await updateDoc(doc(db, PROCESSES_PATH, p.id), { colaborador: 'Removido/Ex-colaborador' });
-                    } catch (e) {
-                        console.warn(`Não foi possível atualizar o processo ${p.id}. Pode ter sido excluído.`);
-                    }
+                    p.colaborador = 'Removido/Ex-colaborador';
                 }
             });
+            saveData(LS_PROCESSES_KEY, window.processes);
+            window.renderKanban();
         };
 
         // --- Lógica de Modais de Edição e Gerenciamento ---
@@ -764,7 +761,6 @@
             editForm.querySelector('#inputDataConclusao').value = processToEdit.dataConclusao || '';
             editForm.querySelector('#inputTitulo').value = processToEdit.titulo || '';
             editForm.querySelector('#inputObservacoes').value = processToEdit.observacoes || '';
-            editForm.dataset.createdAt = processToEdit.createdAt || new Date().toISOString();
             
             // Ajusta o texto e remove o botão de gerenciar colaboradores (dentro do novo form)
             editForm.querySelector('#adicionarProcessoBtn').textContent = 'Salvar Edição';
@@ -789,13 +785,14 @@
             const content = `
                 <h3 class="text-xl font-bold mb-4">Gerenciar Colaboradores</h3>
                 
-                <div class="mb-4">
+                <!-- Adicionado form para submissão via Enter/botão -->
+                <form id="addColaboradorForm" class="mb-4">
                     <label for="newColaboradorName" class="block text-sm font-medium text-gray-700 mb-1">Novo Colaborador</label>
                     <div class="flex space-x-2">
-                        <input type="text" id="newColaboradorName" placeholder="Nome do Colaborador" class="flex-grow border-gray-300 rounded-lg shadow-sm p-2">
-                        <button onclick="window.addColaborador()" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition">Adicionar</button>
+                        <input type="text" id="newColaboradorName" name="newColaboradorName" placeholder="Nome do Colaborador" class="flex-grow border-gray-300 rounded-lg shadow-sm p-2" required>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition">Adicionar</button>
                     </div>
-                </div>
+                </form>
 
                 <ul class="max-h-60 overflow-y-auto border rounded-lg p-2" id="colaboradoresListContainer">
                     ${listHtml || '<li class="text-gray-500 py-2">Nenhum colaborador registrado.</li>'}
@@ -806,56 +803,20 @@
                 </div>
             `;
             window.showModal(content);
+            
+            // Adiciona o listener de submissão do formulário no modal
+            document.getElementById('addColaboradorForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const input = document.getElementById('newColaboradorName');
+                window.addColaborador(input.value);
+            });
+            
+            // Foca no input para facilitar a adição
+            document.getElementById('newColaboradorName').focus();
         };
         
-        // --- Lógica do Relatório (Acesso Restrito) ---
+        // --- Lógica do Relatório (Acesso Direto) ---
 
-        /**
-         * Abre o modal de login para acesso ao relatório.
-         */
-        window.openRelatorioLoginModal = function() {
-            const loginHtml = `
-                <h3 class="text-xl font-bold mb-4">Acesso Restrito ao Relatório</h3>
-                <p class="text-gray-600 mb-4">Apenas as Dras. Cássia e Janaína têm acesso.</p>
-                <form id="relatorioLoginForm" class="space-y-4">
-                    <img src="https://placehold.co/400x100/94a3b8/ffffff?text=Permissao+Concedida+Imagem+Aqui" alt="Imagem de Permissão" class="rounded-lg mb-4">
-                    <div>
-                        <label for="loginUser" class="block text-sm font-medium text-gray-700">Login</label>
-                        <input type="text" id="loginUser" required class="w-full border-gray-300 rounded-lg p-2" placeholder="Ex: Dra. Cássia">
-                    </div>
-                    <div>
-                        <label for="loginPass" class="block text-sm font-medium text-gray-700">Senha</label>
-                        <input type="password" id="loginPass" required class="w-full border-gray-300 rounded-lg p-2" placeholder="Senha Secreta">
-                    </div>
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
-                        <button type="submit" class="px-4 py-2 bg-primary-accent text-white font-semibold rounded-lg hover:bg-indigo-700 transition">Acessar</button>
-                    </div>
-                </form>
-            `;
-            window.showModal(loginHtml);
-
-            document.getElementById('relatorioLoginForm').addEventListener('submit', window.handleLogin);
-        };
-
-        /**
-         * Trata o login de acesso restrito.
-         */
-        window.handleLogin = function(event) {
-            event.preventDefault();
-            const user = document.getElementById('loginUser').value.trim();
-            const pass = document.getElementById('loginPass').value.trim();
-
-            if (window.USUARIOS_RELATORIO[user] && window.USUARIOS_RELATORIO[user] === pass) {
-                window.closeModal();
-                window.showModalMessage('Autenticação bem-sucedida! Preparando dashboard do relatório...', 'success');
-                // Novo passo: Abrir o dashboard visual antes de extrair os dados.
-                setTimeout(window.openReportDashboardModal, 1500);
-            } else {
-                window.showModalMessage('Falha na autenticação. Verifique seu login e senha.', 'error');
-            }
-        };
-        
         /**
          * Abre o modal do Dashboard de Relatório Semanal.
          */
@@ -877,7 +838,7 @@
                     <tr class="border-b hover:bg-gray-50 text-sm">
                         <td class="p-2 font-medium truncate max-w-xs">${p.titulo}</td>
                         <td class="p-2 text-center text-gray-600">${p.colaborador}</td>
-                        <td class="p-2 text-center text-xs">${window.formatDate(p.dataRegistro)}</td>
+                        <td class="p-2 text-center text-xs">${p.dataRegistro ? window.formatDate(p.dataRegistro) : '-'}</td>
                         <td class="p-2 text-center font-semibold text-green-600">${window.formatDate(p.dataConclusao)}</td>
                     </tr>
                 `).join('')
@@ -887,7 +848,7 @@
             // 3. Geração do HTML do Modal
             const dashboardHtml = `
                 <div class="relative p-6 overflow-y-auto max-h-[90vh]">
-                    <h2 class="text-2xl md:text-3xl font-extrabold mb-6">Relatório Semanal de Processos (Acesso Concedido)</h2>
+                    <h2 class="text-2xl md:text-3xl font-extrabold mb-6">Relatório Semanal de Processos</h2>
 
                     <h3 class="text-lg font-bold mb-4 text-gray-700">Resumo de Performance (Visão Geral)</h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -940,7 +901,7 @@
                             Baixar Relatório Completo (CSV/Excel)
                         </button>
                         <button onclick="window.closeModal()" class="w-full px-4 py-3 bg-red-500 text-white font-bold rounded-lg shadow-lg hover:bg-red-600 transition duration-150">
-                            Sair e Bloquear Relatório
+                            Fechar Relatório
                         </button>
                     </div>
                 </div>
@@ -952,10 +913,9 @@
 
 
         /**
-         * Exporta os dados completos para CSV (agora chamada pelo Dashboard).
+         * Exporta os dados completos para CSV.
          */
         window.exportToExcelData = function() {
-            // Usa o array global window.processes, que está sincronizado pelo Firestore
             const header = [
                 "ID", "Colaborador", "Status", "Data de Registro", "Data de Previsão",
                 "Data de Conclusão", "Título do Processo/Tarefa", "Observações"
@@ -1002,77 +962,27 @@
             window.showModalMessage('Relatório Excel (CSV) gerado com sucesso!', 'info');
         };
 
-        // --- Inicialização Firebase e Sincronização ---
+        // --- Inicialização Local ---
 
-        function setupFirestoreListeners() {
-            if (!db) return;
+        function loadInitialDataAndRender() {
+            window.updateStatus('Carregando dados locais...', true);
+
+            // Carrega processos (ou lista vazia se for a primeira vez)
+            window.processes = loadData(LS_PROCESSES_KEY, []);
+
+            // Carrega colaboradores (ou lista inicial se for a primeira vez)
+            let loadedColaboradores = loadData(LS_COLABORADORES_KEY, null);
             
-            // Listener 1: Processos (Público)
-            const processesCollection = collection(db, PROCESSES_PATH);
-            onSnapshot(processesCollection, (snapshot) => {
-                window.processes = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                window.renderKanban();
-                window.updateStatus('Dados de Processos Sincronizados', false);
-            }, (error) => {
-                console.error("Erro ao sincronizar processos:", error);
-                window.updateStatus('Erro ao carregar processos', false);
-            });
-
-            // Listener 2: Colaboradores (Público)
-            const colaboradoresDoc = doc(db, COLABORADORES_PATH, COLABORADORES_DOC_ID);
-            onSnapshot(colaboradoresDoc, (docSnap) => {
-                if (docSnap.exists()) {
-                    window.colaboradoresList = docSnap.data().list || window.COLABORADORES_INICIAIS;
-                } else {
-                    // Inicializa a lista se não existir no Firestore
-                    window.colaboradoresList = window.COLABORADORES_INICIAIS;
-                    saveColaboradoresList(); 
-                }
-                window.fillColaboradorSelects();
-                window.updateStatus('Dados de Colaboradores Sincronizados', false);
-            }, (error) => {
-                console.error("Erro ao sincronizar colaboradores:", error);
-                window.updateStatus('Erro ao carregar colaboradores', false);
-            });
-        }
-        
-        async function initializeFirebase() {
-            window.updateStatus('Conectando ao Firebase...');
-            try {
-                setLogLevel('Debug');
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // Autenticação
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                    } else {
-                        // Tenta autenticar usando o token fornecido ou anonimamente
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                        userId = auth.currentUser.uid;
-                    }
-                    
-                    document.getElementById('user-id-display').textContent = `ID do Usuário: ${userId}`;
-                    window.isAuthReady = true;
-                    window.updateStatus('Conectado!', false);
-                    setupFirestoreListeners(); // Inicia a escuta dos dados após a autenticação
-                    setupEventListeners(); // Configura listeners da UI
-                });
-
-            } catch (e) {
-                console.error("Erro fatal na inicialização do Firebase:", e);
-                window.showModalMessage('Erro fatal de conexão. Recarregue a página.', 'error');
-                window.updateStatus('Falha na Conexão', false);
+            if (!loadedColaboradores || loadedColaboradores.length === 0) {
+                loadedColaboradores = window.COLABORADORES_INICIAIS;
+                saveData(LS_COLABORADORES_KEY, loadedColaboradores);
             }
+
+            window.colaboradoresList = loadedColaboradores;
+
+            window.fillColaboradorSelects();
+            window.renderKanban();
+            window.updateStatus('Pronto!', false);
         }
         
         function setupEventListeners() {
@@ -1091,13 +1001,15 @@
                 window.applyFilters();
             });
 
-            document.getElementById('extrairRelatorioBtn')?.addEventListener('click', window.openRelatorioLoginModal);
+            // Botão de Relatório agora chama diretamente o dashboard (sem login)
+            document.getElementById('extrairRelatorioBtn')?.addEventListener('click', window.openReportDashboardModal);
             document.getElementById('manageColaboradoresBtn')?.addEventListener('click', window.openManageColaboradoresModal);
 
             window.modalContainer.addEventListener('click', (e) => {
+                // Se clicar no container, fecha o modal, exceto se for o relatório (que tem um close manual)
                 if (e.target === window.modalContainer) {
-                    // Impede o fechamento do modal do dashboard ao clicar fora
-                    if (!e.target.querySelector('.relative.p-6')) {
+                    const isReportModal = window.modalContent.querySelector('.relative.p-6');
+                    if (!isReportModal) {
                          window.closeModal();
                     }
                 }
@@ -1107,8 +1019,11 @@
             document.getElementById('inputDataRegistro').valueAsDate = new Date();
         }
 
-        // Inicia o aplicativo
-        initializeFirebase();
+        // Inicia o aplicativo ao carregar a página
+        window.onload = function() {
+            setupEventListeners();
+            loadInitialDataAndRender();
+        }
     </script>
 </body>
 </html>
